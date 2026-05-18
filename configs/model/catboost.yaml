@@ -1,0 +1,8 @@
+name: catboost
+estimator: catboost.CatBoostRegressor
+params:
+  iterations: 1000
+  depth: 8
+  learning_rate: 0.05
+  loss_function: RMSE
+  verbose: false

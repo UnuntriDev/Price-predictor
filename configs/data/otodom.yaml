@@ -1,0 +1,13 @@
+source: otodom
+# The eight modelled fields plus capture metadata (see domain.Listing).
+target: price
+features:
+  - area
+  - rooms
+  - city
+  - district
+  - year_built
+  - floor
+  - property_type
+test_size: 0.2
+validation_size: 0.1

@@ -1,0 +1,10 @@
+cv_folds: 5
+scoring: neg_mean_absolute_error
+early_stopping_rounds: 50
+optuna:
+  n_trials: 50
+  timeout_seconds: 1800
+  direction: minimize
+mlflow:
+  log_models: true
+  register_best: true
