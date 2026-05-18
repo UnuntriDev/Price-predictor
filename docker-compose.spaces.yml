@@ -1,0 +1,16 @@
+# Mirrors what Hugging Face Spaces builds: the single supervisord image.
+# Use this to reproduce the public demo locally:
+#   docker compose -f docker-compose.spaces.yml up --build
+name: price-predictor-spaces
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/spaces.Dockerfile
+    environment:
+      PP_ENV: prod
+      # No Postgres/MLflow here: the Space runs model-from-registry only.
+      PP_MLFLOW__TRACKING_URI: sqlite:///mlflow.db
+    ports:
+      - "7860:7860"
