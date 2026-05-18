@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from price_predictor.config.settings import APISettings, MLflowSettings
 from price_predictor.domain import ModelStage
 from price_predictor.registry import MLflowModelRegistry
-from price_predictor.serving import create_app
+from price_predictor.serving import create_app, get_app
 from price_predictor.serving.predictor import ModelBackedPredictor
 
 
@@ -55,3 +55,8 @@ def test_predict_rejects_invalid_payload() -> None:
 def test_settings_default_ports() -> None:
     api = APISettings()
     assert (api.port, api.streamlit_port) == (8000, 7860)
+
+
+def test_asgi_composition_root_builds_a_live_app() -> None:
+    resp = TestClient(get_app()).get("/health")
+    assert resp.status_code == 200
