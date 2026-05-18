@@ -1,0 +1,38 @@
+# Version control
+.git/
+.gitignore
+
+# Python caches & envs
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local data & ML artifacts (never bake into image)
+data/
+mlruns/
+mlflow.db
+*.duckdb
+artifacts/
+
+# Dev tooling
+tests/
+notebooks/
+docs/
+.github/
+.pre-commit-config.yaml
+docker-compose*.yml
+
+# Secrets
+.env
+.env.local
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

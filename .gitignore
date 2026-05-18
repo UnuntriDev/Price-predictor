@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+
+# uv
+uv.lock.bak
+
+# Tooling caches
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# ML / data artifacts
+mlruns/
+mlflow.db
+*.duckdb
+data/raw/
+data/interim/
+data/processed/
+artifacts/
+*.joblib
+*.onnx
+
+# DVC
+/data/**/*.dvc
+.dvc/cache/
+.dvc/tmp/
+
+# Secrets / local env
+.env
+.env.local
+
+# Notebooks
+.ipynb_checkpoints/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.swp
