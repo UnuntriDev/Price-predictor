@@ -1,0 +1,11 @@
+# Normalise all text to LF in the repo and working tree.
+# Critical for Linux Docker images (shell entrypoints, supervisord.conf)
+# and for `ruff format --check` parity between Windows dev and CI.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.duckdb binary
+uv.lock -text
