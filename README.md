@@ -158,8 +158,14 @@ make drift             # KS+PSI gate + Evidently HTML report
 - **Scraping** — inactive illustrative skeleton only (ADR 0013/0014;
   Otodom DataDome anti-bot).
 
-**Not wired:** the HF-Space-pulls-from-remote-registry deploy (ADR
-0011) remains an infra follow-up.
+- **Deploy** — the HF Space is model-free and pulls the production
+  model from a remote MLflow registry at startup via a tolerant
+  warmup (ADR 0011); supply `PP_MLFLOW__TRACKING_URI` (+ optional
+  registry/model/stage) as Space secrets.
+
+**Operator-only (no code left):** stand up the hosted MLflow server
+and set the HF Space secrets; the deploy workflow already pushes the
+image-config repo when `HF_TOKEN`/`HF_SPACE_ID` are present.
 
 ## License
 

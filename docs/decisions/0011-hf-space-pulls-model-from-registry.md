@@ -1,6 +1,6 @@
 # 11. HF Space pulls the model from the remote registry at startup
 
-- Status: accepted
+- Status: accepted (wired)
 - Date: 2026-05-19
 
 ## Context
@@ -24,3 +24,16 @@ model by name + stage). The image stays model-free.
 - Cold start is slower (model download) and depends on registry
   availability — acceptable for a demo; a cached/bundled fallback can be
   revisited if it bites.
+
+## Status note (wired)
+
+`serving.app` runs a FastAPI **lifespan** that calls
+`ModelBackedPredictor.warmup()` at startup: it pulls the model from the
+registry but **swallows failures** (logs, never raises) so the
+container still becomes healthy; `/predict` then retries and 503s until
+the registry is reachable. `docker/spaces.Dockerfile` is model-free and
+documents the required runtime secrets; `docker-compose.spaces.yml`
+parameterises them (`PP_MLFLOW__TRACKING_URI`,
+`PP_MLFLOW__REGISTRY_URI`, `PP_API__MODEL_NAME`, `PP_API__MODEL_STAGE`).
+**Still external:** standing up the hosted MLflow server and setting
+the HF Space secrets is an operator task, not code.

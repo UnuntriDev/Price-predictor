@@ -6,13 +6,15 @@ from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 
-from price_predictor.config.settings import APISettings
+from price_predictor.config.settings import APISettings, MLflowSettings
 from price_predictor.domain import (
     ModelNotLoadedError,
     PredictionRequest,
     PredictionResult,
 )
+from price_predictor.registry import MLflowModelRegistry
 from price_predictor.serving import create_app, get_app
+from price_predictor.serving.predictor import ModelBackedPredictor
 
 _PAYLOAD = {
     "city": "warszawa",
@@ -82,3 +84,14 @@ def test_settings_default_ports() -> None:
 def test_asgi_composition_root_builds_a_live_app() -> None:
     resp = TestClient(get_app()).get("/health")
     assert resp.status_code == 200
+
+
+def test_startup_warmup_is_tolerant_of_registry_outage() -> None:
+    # ADR 0011: registry down at startup -> app still healthy; /predict 503.
+    predictor = ModelBackedPredictor(
+        MLflowModelRegistry(MLflowSettings(tracking_uri="http://127.0.0.1:1")),
+        model_name="price-predictor",
+    )
+    with TestClient(create_app(predictor)) as client:  # runs lifespan/warmup
+        assert client.get("/health").status_code == 200
+        assert client.post("/predict", json=_PAYLOAD).status_code == 503

@@ -20,7 +20,6 @@ from price_predictor.domain import (
     ModelStage,
     PredictionRequest,
     PredictionResult,
-    PricePredictorError,
 )
 from price_predictor.features import FEATURE_COLUMNS
 from price_predictor.registry.ports import ModelRegistry
@@ -55,11 +54,25 @@ class ModelBackedPredictor:
             try:
                 self._model = self._registry.load_model(self._model_name, self._stage)
                 self._version = self._registry.get_version(self._model_name, self._stage).version
-            except PricePredictorError as exc:
+            except Exception as exc:
+                # Boundary: any registry/MLflow failure (incl. unreachable
+                # server) becomes the one domain error serving handles.
                 msg = f"could not load '{self._model_name}'@{self._stage.value}"
                 raise ModelNotLoadedError(msg) from exc
             _log.info("model.loaded", name=self._model_name, version=self._version)
         return self._model
+
+    def warmup(self) -> None:
+        """Eagerly load the model at startup (ADR 0011), tolerantly.
+
+        A failure (registry/network down) is logged, not raised, so the
+        container still becomes healthy; ``/predict`` then returns 503
+        and retries the load on each request until it succeeds.
+        """
+        try:
+            self._ensure_loaded()
+        except ModelNotLoadedError as exc:
+            _log.warning("model.warmup_failed", error=str(exc))
 
     def predict(self, request: PredictionRequest) -> PredictionResult:
         """See :meth:`PredictorService.predict`."""

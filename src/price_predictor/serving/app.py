@@ -8,6 +8,8 @@ production wiring lives in one composition root.
 from __future__ import annotations
 
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
@@ -48,7 +50,18 @@ def create_app(predictor: PredictorService) -> FastAPI:
     Returns:
         A configured :class:`fastapi.FastAPI` instance.
     """
-    app = FastAPI(title="PricePredictor API", version=__version__)
+
+    @asynccontextmanager
+    async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        # ADR 0011: pull the model from the registry at startup. Tolerant
+        # by design - a registry outage must not stop the app becoming
+        # healthy (warmup swallows failures; /predict retries + 503s).
+        warmup = getattr(predictor, "warmup", None)
+        if callable(warmup):
+            warmup()
+        yield
+
+    app = FastAPI(title="PricePredictor API", version=__version__, lifespan=_lifespan)
     # Initialise label series so /metrics exposes them before any request.
     for outcome in _OUTCOMES:
         PREDICTION_REQUESTS.labels(outcome=outcome)

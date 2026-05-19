@@ -103,3 +103,17 @@ def test_registry_failure_maps_to_model_not_loaded() -> None:
     pred = ModelBackedPredictor(_Registry(None, fail=True), "price-predictor")
     with pytest.raises(ModelNotLoadedError, match="could not load"):
         pred.predict(_REQUEST)
+
+
+def test_warmup_loads_model_when_registry_ok() -> None:
+    pred = ModelBackedPredictor(_Registry(_Model(1.0)), "price-predictor")
+    pred.warmup()
+    out = pred.predict(_REQUEST)
+    assert out.model_version == "5"
+
+
+def test_warmup_swallows_registry_failure() -> None:
+    pred = ModelBackedPredictor(_Registry(None, fail=True), "price-predictor")
+    pred.warmup()  # ADR 0011: must not raise
+    with pytest.raises(ModelNotLoadedError):
+        pred.predict(_REQUEST)

@@ -29,6 +29,15 @@ RUN apt-get update \
     && groupadd --system app \
     && useradd --system --gid app --create-home app
 
+# ADR 0011: the image is model-free. The Space pulls the production
+# model from a REMOTE MLflow registry at startup. Supply these as
+# Hugging Face Space *secrets/variables* at runtime (do NOT bake them):
+#   PP_MLFLOW__TRACKING_URI   e.g. https://mlflow.example.com
+#   PP_MLFLOW__REGISTRY_URI   (optional; defaults to the tracking URI)
+#   PP_API__MODEL_NAME        (optional; default price-predictor)
+#   PP_API__MODEL_STAGE       (optional; default production)
+# If unset, settings fall back to local sqlite (no model) and the demo
+# serves /predict -> 503 until a registry is configured.
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PP_CONFIGS_DIR=/app/configs \

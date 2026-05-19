@@ -10,7 +10,12 @@ services:
       dockerfile: docker/spaces.Dockerfile
     environment:
       PP_ENV: prod
-      # No Postgres/MLflow here: the Space runs model-from-registry only.
-      PP_MLFLOW__TRACKING_URI: sqlite:///mlflow.db
+      # ADR 0011: model is pulled from a REMOTE MLflow registry at
+      # startup. Point this at your tracking server; if left at the
+      # sqlite default the demo serves /predict -> 503 (no model).
+      PP_MLFLOW__TRACKING_URI: ${PP_MLFLOW__TRACKING_URI:-sqlite:///mlflow.db}
+      PP_MLFLOW__REGISTRY_URI: ${PP_MLFLOW__REGISTRY_URI:-}
+      PP_API__MODEL_NAME: ${PP_API__MODEL_NAME:-price-predictor}
+      PP_API__MODEL_STAGE: ${PP_API__MODEL_STAGE:-production}
     ports:
       - "7860:7860"
