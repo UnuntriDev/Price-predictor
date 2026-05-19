@@ -1,25 +1,28 @@
 """``make scrape`` entrypoint.
 
-Builds the Scrapy runner from settings and starts it. The runner raises
-a Phase 2 ``NotImplementedError``; this wrapper reports it cleanly.
+Builds the Scrapy runner from settings (with Postgres persistence wired)
+and runs the crawl. Requires Chromium (`make browsers`) and a reachable
+Postgres; failures are reported cleanly instead of crashing.
 """
 
 from __future__ import annotations
 
 import sys
 
-from price_predictor.config import get_settings
+from price_predictor.config import configure_logging, get_settings
+from price_predictor.domain import PricePredictorError
 from price_predictor.scraping import ScrapyRunner
 
 
 def main() -> int:
-    """Construct the crawl runner and attempt a run."""
+    """Construct the crawl runner and run it, persisting to Postgres."""
     settings = get_settings()
-    runner = ScrapyRunner(settings.scraping)
+    configure_logging(settings.logging)
+    runner = ScrapyRunner(settings.scraping, postgres=settings.postgres)
     try:
         count = runner.run()
-    except NotImplementedError as exc:
-        sys.stdout.write(f"[scrape] not implemented yet: {exc}\n")
+    except PricePredictorError as exc:
+        sys.stdout.write(f"[scrape] failed: {exc}\n")
         return 2
     sys.stdout.write(f"[scrape] captured {count} listings\n")
     return 0

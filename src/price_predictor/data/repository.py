@@ -5,7 +5,9 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 
 import psycopg
+from psycopg.conninfo import conninfo_to_dict
 from psycopg.rows import dict_row
+from pydantic import SecretStr
 
 from price_predictor.config.settings import PostgresSettings
 from price_predictor.domain import Listing, StorageError
@@ -75,6 +77,27 @@ class PostgresListingRepository:
 
     def __init__(self, settings: PostgresSettings) -> None:
         self._settings = settings
+
+    @classmethod
+    def from_dsn(cls, dsn: str) -> PostgresListingRepository:
+        """Build a repository from a libpq connection string.
+
+        Args:
+            dsn: e.g. ``postgresql://user:pass@host:5432/db``.
+
+        Returns:
+            A repository pointed at ``dsn``.
+        """
+        info = conninfo_to_dict(dsn)
+        return cls(
+            PostgresSettings(
+                host=str(info.get("host", "localhost")),
+                port=int(str(info.get("port", 5432))),
+                user=str(info.get("user", "price_predictor")),
+                password=SecretStr(str(info.get("password", ""))),
+                database=str(info.get("dbname", "price_predictor")),
+            )
+        )
 
     def create_schema(self) -> None:
         """Create the ``listings`` table if it does not exist.

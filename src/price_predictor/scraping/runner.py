@@ -12,11 +12,12 @@ from __future__ import annotations
 from typing import Any
 
 from price_predictor.config import get_logger
-from price_predictor.config.settings import ScrapingSettings
+from price_predictor.config.settings import PostgresSettings, ScrapingSettings
 
 _log = get_logger(__name__)
 
-_PIPELINE = "price_predictor.scraping.pipelines.ListingValidationPipeline"
+_VALIDATE_PIPELINE = "price_predictor.scraping.pipelines.ListingValidationPipeline"
+_PERSIST_PIPELINE = "price_predictor.scraping.pipelines.PostgresPersistPipeline"
 _PW_HANDLER = "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler"
 
 
@@ -27,8 +28,13 @@ class ScrapyRunner:
         settings: Polite-crawl parameters injected from app settings.
     """
 
-    def __init__(self, settings: ScrapingSettings) -> None:
+    def __init__(
+        self,
+        settings: ScrapingSettings,
+        postgres: PostgresSettings | None = None,
+    ) -> None:
         self._settings = settings
+        self._postgres = postgres
 
     def _seed_urls(self) -> list[str]:
         base = self._settings.base_url.rstrip("/")
@@ -38,18 +44,24 @@ class ScrapyRunner:
         ]
 
     def _scrapy_settings(self) -> dict[str, Any]:
+        pipelines = {_VALIDATE_PIPELINE: 300}
+        extra: dict[str, Any] = {}
+        if self._postgres is not None:
+            pipelines[_PERSIST_PIPELINE] = 800
+            extra["PP_POSTGRES_DSN"] = self._postgres.dsn
         return {
             "USER_AGENT": self._settings.user_agent,
             "DOWNLOAD_DELAY": self._settings.download_delay_seconds,
             "CONCURRENT_REQUESTS": self._settings.concurrent_requests,
             "ROBOTSTXT_OBEY": True,
-            "ITEM_PIPELINES": {_PIPELINE: 300},
+            "ITEM_PIPELINES": pipelines,
             "DOWNLOAD_HANDLERS": {
                 "http": _PW_HANDLER,
                 "https": _PW_HANDLER,
             },
             "TWISTED_REACTOR": ("twisted.internet.asyncioreactor.AsyncioSelectorReactor"),
             "LOG_LEVEL": "INFO",
+            **extra,
         }
 
     def run(self) -> int:
