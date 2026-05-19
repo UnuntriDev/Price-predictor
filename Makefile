@@ -1,8 +1,8 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-.PHONY: help install browsers lint format type test check pre-commit \
-        up down serve ui train scrape drift data-push data-pull clean
+.PHONY: help install lint format type test check pre-commit \
+        up down serve ui data train scrape drift data-push data-pull clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -10,9 +10,6 @@ help: ## Show this help
 
 install: ## Create the locked virtual environment
 	uv sync
-
-browsers: ## Install the Chromium browser for the scraper (Playwright)
-	uv run playwright install chromium
 
 lint: ## Ruff lint
 	uv run ruff check .
@@ -46,13 +43,19 @@ ui: ## Run the Streamlit demo
 	uv run streamlit run src/price_predictor/ui/streamlit_app.py \
 		--server.port 7860
 
-train: ## Train+register a model from the listings in Postgres
+data: ## Download the Kaggle dataset into data/raw and track with DVC
+	uv run kaggle datasets download \
+		-d krzysztofjamroz/apartment-prices-in-poland -p data/raw/ --unzip
+	uv run dvc add data/raw
+	@echo "tracked data/raw with DVC; run 'make data-push' to upload"
+
+train: ## Train+register a model from the Kaggle data (run `make data` first)
 	uv run python scripts/train.py
 
-scrape: browsers ## Run the Otodom crawl (needs Chromium via `make browsers`)
+scrape: ## Inactive: Otodom blocked by DataDome (ADR 0013/0014)
 	uv run python scripts/scrape.py
 
-drift: ## Drift gate + Evidently HTML report from Postgres listings
+drift: ## Drift gate + Evidently HTML report from the Kaggle data
 	uv run python -m price_predictor.monitoring.job
 
 data-push: ## Push DVC-tracked data/models to the MinIO remote

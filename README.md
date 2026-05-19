@@ -1,18 +1,37 @@
 # PricePredictor
 
-**End-to-end MLOps pipeline that predicts Polish real-estate prices from
-Otodom listings** — scraping, validated data contracts, training with
-experiment tracking, a registry-backed inference API, a Streamlit demo,
-and drift monitoring. Built to portfolio quality: strict typing,
-Protocol-first interfaces, dependency injection, and a reproducible
-toolchain.
+**End-to-end MLOps pipeline that predicts Polish apartment prices from
+the public Kaggle dataset** — versioned data, validated contracts,
+training with conformal intervals and experiment tracking, a
+registry-backed inference API, a Streamlit demo, and drift monitoring.
+Built to portfolio quality: strict typing, Protocol-first interfaces,
+dependency injection, and a reproducible toolchain.
 
-> **Status: Phase 2 — implemented.** The full loop runs end to end:
-> `scrape → Postgres → train (+ conformal) → MLflow register → serve
-> /predict → drift gate + Evidently report`. Strict typing, tests, and
-> CI are green. One provisional item: the Otodom `__NEXT_DATA__` key
-> paths are an assumed contract (ADR 0013) pending a real capture —
-> isolated to one function and a swappable fixture.
+> **Status: Phase 2 — implemented.** The loop runs end to end:
+> `make data → train (+ conformal) → MLflow register → serve /predict
+> → drift gate + Evidently report`. Strict typing, tests, and CI are
+> green. Scraping is retained only as an inactive illustrative skeleton
+> (see Data Source & Ethics).
+
+## Data Source & Ethics
+
+Direct scraping of Polish real estate portals (Otodom, OLX) was
+initially planned but proved infeasible due to aggressive anti-bot
+protection (DataDome). The project pivoted to using a public Kaggle
+dataset (Apartment Prices in Poland, krzysztofjamroz) which actually
+provides richer features (POI distances, building condition) than basic
+scraping would yield. The scraping module remains in the codebase as an
+illustrative skeleton showing the architectural pattern, but is not
+active in the data pipeline. This is a deliberate trade-off prioritizing
+reproducibility and focus on MLOps over scraping engineering.
+
+Fetch the data on demand (Kaggle token required; CSVs are never
+committed, they are DVC-tracked):
+
+```bash
+make data        # kaggle download -> data/raw + dvc add
+make data-push   # upload to the MinIO/S3 DVC remote
+```
 
 ---
 
@@ -21,24 +40,22 @@ toolchain.
 ```mermaid
 flowchart LR
     subgraph Acquire
-        OT[Otodom] -->|scrapy + playwright| SP[scraping]
-        SP --> VAL[data: Pandera contract]
-        VAL --> PG[(Postgres: listings)]
+        KG[Kaggle dataset] -->|kaggle CLI + DVC| LD[data.kaggle loader]
+        LD --> VAL[data: Pandera RawListingSchema]
     end
     subgraph Learn
-        PG --> FE[features]
-        FE --> TR[training: xgb/lgbm/catboost + optuna]
+        VAL --> FE[features]
+        FE --> TR[training: xgb/lgbm/catboost + optuna + conformal]
         TR --> ML[(MLflow tracking)]
         TR --> REG[registry: MLflow Model Registry]
     end
     subgraph Serve
-        REG --> API[serving: FastAPI]
+        REG --> API[serving: FastAPI /predict]
         API --> UI[ui: Streamlit]
-        API --> PRED[(Postgres: predictions)]
     end
     subgraph Observe
         API --> PROM[monitoring: Prometheus]
-        PRED --> EV[monitoring: Evidently drift]
+        VAL --> EV[monitoring: KS+PSI gate / Evidently HTML]
         PROM --> GRAF[Grafana]
     end
 
@@ -105,29 +122,31 @@ tests/unit + tests/integration   mirror src/
 
 ## Modelled fields
 
-`price` (target), `area`, `rooms`, `city`, `district`, `year_built`,
-`floor`, `property_type` — plus `listing_id` / `scraped_at` metadata.
-Sanity bounds live in `domain.constants` and are shared by the Pydantic
-model and the Pandera frame schema so they cannot drift.
+Target `price_pln`. Numeric: `square_meters`, `rooms`, `floor`,
+`floor_count`, `build_year`, `centre_distance_km`, `poi_count` + 7 POI
+distances. Categorical: `city`, `property_type`, `ownership`,
+`building_material`, `condition`. Boolean: `has_*`. Bounds live in
+`domain.constants`, shared by the Pydantic `Listing` and the Pandera
+`RawListingSchema` so they cannot drift (ADR 0014).
 
 ## Phase 2 — implemented
 
-Design decisions are recorded in [ADRs 0006–0013](docs/decisions/).
+Design decisions are recorded in [ADRs 0006–0014](docs/decisions/).
 Run the loop:
 
 ```bash
-make browsers          # Chromium for the scraper (once)
-make up                # pg / mlflow / prometheus / grafana / api / ui
-make scrape            # Otodom → __NEXT_DATA__ → validate → Postgres
-make train             # Postgres → features → fit → conformal → MLflow
+make up                # pg / mlflow / prometheus / grafana / api / ui / minio
+make data              # Kaggle download -> data/raw + dvc add
+make train             # data -> features -> fit -> conformal -> MLflow
 make serve             # /predict: price + conformal interval
 make drift             # KS+PSI gate + Evidently HTML report
 ```
 
-- **Scraping** — scrapy-playwright render, extract from `__NEXT_DATA__`
-  (not DOM selectors), Pandera-validated, batched upsert into Postgres.
-- **Features** — canonical district dictionary + smoothed target
-  encoding; leakage-aware (no price-derived inputs).
+- **Data** — Kaggle "Apartment Prices in Poland" via the Kaggle CLI;
+  loader merges monthly sale snapshots, normalises, Pandera-validated;
+  DVC-tracked on an S3-compatible MinIO remote (ADR 0009/0014).
+- **Features** — median/sentinel imputation + feature selection;
+  leakage-aware (target/ids never emitted).
 - **Training** — `run_training` orchestrates validate→split→features→
   fit→**conformal**→evaluate→MLflow `log_and_register`; Optuna tuner.
 - **Registry** — manual promotion gate with an automated
@@ -136,15 +155,11 @@ make drift             # KS+PSI gate + Evidently HTML report
   the artifact is loaded from the registry at startup.
 - **Monitoring** — KS+PSI drift gate (deterministic) plus the Evidently
   HTML report job (ADR 0012).
+- **Scraping** — inactive illustrative skeleton only (ADR 0013/0014;
+  Otodom DataDome anti-bot).
 
-- **Data versioning** — DVC on an S3-compatible MinIO remote (ADR
-  0009); `make data-push` / `make data-pull`, `minio` in compose.
-
-**Provisional:** the Otodom `__NEXT_DATA__` key paths are an assumed
-contract (ADR 0013), exercised against a swappable synthetic fixture
-until a real capture is supplied. **Not wired:** the
-HF-Space-pulls-from-remote-registry deploy (ADR 0011) remains an infra
-follow-up.
+**Not wired:** the HF-Space-pulls-from-remote-registry deploy (ADR
+0011) remains an infra follow-up.
 
 ## License
 
