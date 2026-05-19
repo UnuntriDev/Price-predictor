@@ -17,6 +17,22 @@ jobs:
   quality:
     name: Lint, type-check, test
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: price_predictor
+          POSTGRES_PASSWORD: ci-secret
+          POSTGRES_DB: price_predictor
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U price_predictor"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PP_TEST_PG_DSN: postgresql://price_predictor:ci-secret@localhost:5432/price_predictor
     steps:
       - uses: actions/checkout@v4
 
