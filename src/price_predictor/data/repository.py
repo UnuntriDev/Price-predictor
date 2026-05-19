@@ -1,4 +1,9 @@
-"""Postgres-backed :class:`ListingRepository` (psycopg v3)."""
+"""Postgres-backed :class:`ListingRepository` (psycopg v3).
+
+Mirrors the Kaggle-schema :class:`Listing`. The natural key is
+``(id, snapshot_month)`` because the dataset is a monthly panel: the
+same listing id recurs across snapshots.
+"""
 
 from __future__ import annotations
 
@@ -13,58 +18,90 @@ from price_predictor.config.settings import PostgresSettings
 from price_predictor.domain import Listing, StorageError
 
 _COLUMNS = (
-    "listing_id",
-    "source_url",
-    "scraped_at",
-    "price",
-    "area",
-    "rooms",
+    "id",
     "city",
-    "district",
-    "year_built",
-    "floor",
     "property_type",
+    "square_meters",
+    "rooms",
+    "floor",
+    "floor_count",
+    "build_year",
+    "latitude",
+    "longitude",
+    "centre_distance_km",
+    "poi_count",
+    "school_distance_km",
+    "clinic_distance_km",
+    "post_office_distance_km",
+    "kindergarten_distance_km",
+    "restaurant_distance_km",
+    "college_distance_km",
+    "pharmacy_distance_km",
+    "ownership",
+    "building_material",
+    "condition",
+    "has_parking",
+    "has_balcony",
+    "has_elevator",
+    "has_security",
+    "has_storage",
+    "price_pln",
+    "snapshot_month",
 )
 
 _CREATE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS listings (
-    listing_id    TEXT PRIMARY KEY,
-    source_url    TEXT NOT NULL,
-    scraped_at    TIMESTAMPTZ NOT NULL,
-    price         NUMERIC(12, 2) NOT NULL,
-    area          DOUBLE PRECISION NOT NULL,
-    rooms         INTEGER NOT NULL,
-    city          TEXT NOT NULL,
-    district      TEXT NOT NULL,
-    year_built    INTEGER NOT NULL,
-    floor         INTEGER NOT NULL,
-    property_type TEXT NOT NULL
+    id                       TEXT NOT NULL,
+    city                     TEXT NOT NULL,
+    property_type            TEXT,
+    square_meters            DOUBLE PRECISION NOT NULL,
+    rooms                    INTEGER NOT NULL,
+    floor                    INTEGER,
+    floor_count              INTEGER,
+    build_year               INTEGER,
+    latitude                 DOUBLE PRECISION NOT NULL,
+    longitude                DOUBLE PRECISION NOT NULL,
+    centre_distance_km       DOUBLE PRECISION NOT NULL,
+    poi_count                INTEGER NOT NULL,
+    school_distance_km       DOUBLE PRECISION,
+    clinic_distance_km       DOUBLE PRECISION,
+    post_office_distance_km  DOUBLE PRECISION,
+    kindergarten_distance_km DOUBLE PRECISION,
+    restaurant_distance_km   DOUBLE PRECISION,
+    college_distance_km      DOUBLE PRECISION,
+    pharmacy_distance_km     DOUBLE PRECISION,
+    ownership                TEXT NOT NULL,
+    building_material        TEXT,
+    condition                TEXT,
+    has_parking              BOOLEAN NOT NULL,
+    has_balcony              BOOLEAN NOT NULL,
+    has_elevator             BOOLEAN,
+    has_security             BOOLEAN NOT NULL,
+    has_storage              BOOLEAN NOT NULL,
+    price_pln                BIGINT NOT NULL,
+    snapshot_month           DATE NOT NULL,
+    PRIMARY KEY (id, snapshot_month)
 );
 """
 
-_UPSERT = """
-INSERT INTO listings (
-    listing_id, source_url, scraped_at, price, area, rooms,
-    city, district, year_built, floor, property_type
-) VALUES (
-    %(listing_id)s, %(source_url)s, %(scraped_at)s, %(price)s, %(area)s,
-    %(rooms)s, %(city)s, %(district)s, %(year_built)s, %(floor)s,
-    %(property_type)s
+_PLACEHOLDERS = ", ".join(f"%({c})s" for c in _COLUMNS)
+_UPDATE_SET = ", ".join(
+    f"{c} = EXCLUDED.{c}" for c in _COLUMNS if c not in {"id", "snapshot_month"}
 )
-ON CONFLICT (listing_id) DO UPDATE SET
-    source_url = EXCLUDED.source_url,
-    scraped_at = EXCLUDED.scraped_at,
-    price = EXCLUDED.price,
-    area = EXCLUDED.area,
-    rooms = EXCLUDED.rooms,
-    city = EXCLUDED.city,
-    district = EXCLUDED.district,
-    year_built = EXCLUDED.year_built,
-    floor = EXCLUDED.floor,
-    property_type = EXCLUDED.property_type;
-"""
+_UPSERT = (
+    f"INSERT INTO listings ({', '.join(_COLUMNS)}) VALUES ({_PLACEHOLDERS}) "
+    f"ON CONFLICT (id, snapshot_month) DO UPDATE SET {_UPDATE_SET};"
+)
+_SELECT_ALL = f"SELECT {', '.join(_COLUMNS)} FROM listings ORDER BY id, snapshot_month;"
 
-_SELECT_ALL = f"SELECT {', '.join(_COLUMNS)} FROM listings ORDER BY listing_id;"
+
+def _row(listing: Listing) -> dict[str, object]:
+    data = listing.model_dump()
+    for enum_col in ("city", "property_type", "ownership", "building_material", "condition"):
+        value = data[enum_col]
+        if value is not None:
+            data[enum_col] = value.value if hasattr(value, "value") else value
+    return data
 
 
 class PostgresListingRepository:
@@ -114,22 +151,7 @@ class PostgresListingRepository:
 
     def upsert_many(self, listings: Iterable[Listing]) -> int:
         """See :meth:`ListingRepository.upsert_many`."""
-        rows = [
-            {
-                "listing_id": listing.listing_id,
-                "source_url": listing.source_url,
-                "scraped_at": listing.scraped_at,
-                "price": listing.price,
-                "area": listing.area,
-                "rooms": listing.rooms,
-                "city": listing.city,
-                "district": listing.district,
-                "year_built": listing.year_built,
-                "floor": listing.floor,
-                "property_type": listing.property_type.value,
-            }
-            for listing in listings
-        ]
+        rows = [_row(listing) for listing in listings]
         if not rows:
             return 0
         try:
