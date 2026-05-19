@@ -1,0 +1,60 @@
+name: Deploy to Hugging Face Spaces
+
+# Manual by default. Becomes a real CD trigger once a model is registered
+# in Phase 2; the job no-ops (does not fail) when HF secrets are absent so
+# forks and PRs stay green.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Push image-config repo to the Space
+    runs-on: ubuntu-latest
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_SPACE_ID: ${{ secrets.HF_SPACE_ID }}
+    steps:
+      - name: Guard on missing secrets
+        id: guard
+        run: |
+          if [ -z "${HF_TOKEN}" ] || [ -z "${HF_SPACE_ID}" ]; then
+            echo "HF_TOKEN / HF_SPACE_ID not set - skipping deploy."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.guard.outputs.skip != 'true'
+        with:
+          fetch-depth: 0
+
+      - name: Assemble Space tree
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          # HF Spaces (Docker SDK) needs a root Dockerfile + README header.
+          cp docker/spaces.Dockerfile Dockerfile
+          {
+            echo "---"
+            echo "title: PricePredictor"
+            echo "sdk: docker"
+            echo "app_port: 7860"
+            echo "pinned: false"
+            echo "---"
+            echo
+            cat README.md
+          } > README.hf.md
+          mv README.hf.md README.md
+
+      - name: Push to Space
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          git config user.email "ci@price-predictor"
+          git config user.name "price-predictor-ci"
+          git add Dockerfile README.md
+          git commit -m "ci: deploy ${GITHUB_SHA::7}" --allow-empty
+          git push --force "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_ID}.git" HEAD:main
