@@ -1,80 +1,55 @@
-"""PriceFeaturePipeline: engineered features + smoothed district TE."""
+"""PriceFeaturePipeline: imputation + feature selection (Kaggle schema)."""
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import polars as pl
 import pytest
 
+from price_predictor.data import load_listings
 from price_predictor.domain import FeatureError
-from price_predictor.features import FeatureTransformer, PriceFeaturePipeline
+from price_predictor.features import FEATURE_COLUMNS, FeatureTransformer, PriceFeaturePipeline
 
-_OUTPUT = ["area", "rooms", "floor", "building_age", "district_te", "city", "property_type"]
+_FIXTURES = Path(__file__).parent.parent / "data" / "kaggle" / "fixtures"
 
 
-def _train_frame() -> pl.DataFrame:
-    return pl.DataFrame(
-        {
-            "listing_id": ["a", "b", "c"],
-            "price": [600_000.0, 800_000.0, 400_000.0],
-            "area": [60.0, 80.0, 40.0],
-            "rooms": [3, 4, 2],
-            "city": ["Warszawa", "Warszawa", "Warszawa"],
-            "district": ["Mokotów", "mokotow", "Wola"],
-            "year_built": [2005, 2015, 1995],
-            "floor": [2, 5, 1],
-            "property_type": ["apartment", "apartment", "house"],
-        }
-    )
+def _frame() -> pl.DataFrame:
+    return load_listings(_FIXTURES).collect()
 
 
 def test_satisfies_port() -> None:
-    assert isinstance(PriceFeaturePipeline(reference_year=2025), FeatureTransformer)
+    assert isinstance(PriceFeaturePipeline(), FeatureTransformer)
 
 
 def test_transform_before_fit_raises() -> None:
     with pytest.raises(FeatureError, match="before fit"):
-        PriceFeaturePipeline(reference_year=2025).transform(_train_frame())
+        PriceFeaturePipeline().transform(_frame())
 
 
 def test_fit_requires_target() -> None:
-    pipe = PriceFeaturePipeline(reference_year=2025)
     with pytest.raises(FeatureError, match="target column"):
-        pipe.fit(_train_frame().drop("price"))
+        PriceFeaturePipeline().fit(_frame().drop("price_pln"))
 
 
-def test_engineered_columns_and_no_target_leak() -> None:
-    pipe = PriceFeaturePipeline(reference_year=2025).fit(_train_frame())
-    out = pipe.transform(_train_frame())
-    assert out.columns == _OUTPUT
-    assert "price" not in out.columns
-    assert out["building_age"].to_list() == [20, 10, 30]
+def test_transform_emits_features_with_no_nulls() -> None:
+    frame = _frame()
+    pipe = PriceFeaturePipeline().fit(frame)
+    out = pipe.transform(frame)
+    assert out.columns == list(FEATURE_COLUMNS)
+    assert out.null_count().to_numpy().sum() == 0
+    assert "price_pln" not in out.columns
 
 
-def test_smoothed_district_target_encoding() -> None:
-    # global mean = 600000; smoothing = 10
-    # mokotow: n=2 mean=700000 -> (2*700000 + 10*600000)/12
-    # wola:    n=1 mean=400000 -> (1*400000 + 10*600000)/11
-    pipe = PriceFeaturePipeline(reference_year=2025, smoothing=10.0).fit(_train_frame())
-    te = pipe.transform(_train_frame())["district_te"].to_list()
-    assert te[0] == pytest.approx(7_400_000 / 12)
-    assert te[1] == pytest.approx(7_400_000 / 12)
-    assert te[2] == pytest.approx(6_400_000 / 11)
-
-
-def test_unseen_district_falls_back_to_global_mean() -> None:
-    pipe = PriceFeaturePipeline(reference_year=2025).fit(_train_frame())
-    unseen = _train_frame().with_columns(district=pl.lit("Ursynów"))
-    assert pipe.transform(unseen)["district_te"].to_list() == pytest.approx(
-        [600_000.0, 600_000.0, 600_000.0]
+def test_imputes_unseen_nulls_with_learned_median() -> None:
+    frame = _frame()
+    pipe = PriceFeaturePipeline().fit(frame)
+    one = frame.head(1).with_columns(
+        floor=pl.lit(None, dtype=pl.Int64),
+        condition=pl.lit(None, dtype=pl.Utf8),
+        has_elevator=pl.lit(None, dtype=pl.Boolean),
     )
-
-
-def test_canonical_dictionary_collapses_aliases() -> None:
-    pipe = PriceFeaturePipeline(
-        reference_year=2025,
-        district_dictionary={"srodmiescie": "centrum", "Wola": "centrum"},
-    ).fit(_train_frame())
-    # Mokotow stays itself; Wola -> centrum. Distinct canonical means.
-    frame = _train_frame().with_columns(district=pl.Series(["Wola", "Wola", "Mokotów"]))
-    out = pipe.transform(frame)["district_te"].to_list()
-    assert out[0] == out[1]  # both canonical 'centrum'
+    out = pipe.transform(one)
+    assert out["floor"].null_count() == 0
+    assert out["condition"].to_list() == ["missing"]
+    assert out["has_elevator"].to_list() == [0]
