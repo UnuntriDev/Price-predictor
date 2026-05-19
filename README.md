@@ -109,10 +109,22 @@ model and the Pandera frame schema so they cannot drift.
 
 ## Phase 2 roadmap
 
-Scraper parsing (Playwright-rendered Otodom) · Pandera validation
-wiring · feature pipeline · training + Optuna + MLflow logging ·
-registry promotion · real `/predict` · Evidently drift job · Streamlit
-form calling the API · integration tests against compose services.
+Design decisions are locked in [ADRs 0006–0011](docs/decisions/):
+
+- **Scraping** — Playwright render, extract from `__NEXT_DATA__` JSON
+  (not DOM selectors); validate via the Pandera `ListingFrame`.
+- **Features** — canonical district dictionary with out-of-fold target
+  encoding fallback; engineered features feed `PriceFeaturePipeline`.
+- **Training** — Optuna + MLflow logging; **conformal** prediction
+  intervals around the boosting regressor.
+- **Registry** — manual promotion gate with an automated
+  promote/hold recommendation.
+- **Data** — S3-compatible DVC remote (MinIO local / AWS S3 prod;
+  GDrive documented fallback).
+- **Serving** — real `/predict`; the HF Space pulls the production
+  model from the remote MLflow registry at startup.
+- Evidently drift job · Streamlit form calling the API · integration
+  tests against the compose services.
 
 ## License
 
