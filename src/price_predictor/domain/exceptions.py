@@ -42,6 +42,10 @@ class StorageError(DataError):
     """A read/write against DuckDB or Postgres failed."""
 
 
+class DataDownloadError(DataError):
+    """The Kaggle dataset could not be downloaded (creds/CLI/network)."""
+
+
 class FeatureError(PricePredictorError):
     """Feature construction failed or produced an invalid frame."""
 

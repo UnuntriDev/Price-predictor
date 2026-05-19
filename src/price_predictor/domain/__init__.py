@@ -7,9 +7,17 @@ the codebase depends on stable contracts rather than each other.
 
 from __future__ import annotations
 
-from price_predictor.domain.enums import ModelStage, PropertyType
+from price_predictor.domain.enums import (
+    BuildingMaterial,
+    CityEnum,
+    ConditionType,
+    ModelStage,
+    OwnershipType,
+    PropertyType,
+)
 from price_predictor.domain.exceptions import (
     ConfigurationError,
+    DataDownloadError,
     DataError,
     DomainValidationError,
     FeatureError,
@@ -29,7 +37,11 @@ from price_predictor.domain.model_version import ModelVersion
 from price_predictor.domain.prediction import PredictionRequest, PredictionResult
 
 __all__ = [
+    "BuildingMaterial",
+    "CityEnum",
+    "ConditionType",
     "ConfigurationError",
+    "DataDownloadError",
     "DataError",
     "DomainValidationError",
     "FeatureError",
@@ -39,6 +51,7 @@ __all__ = [
     "ModelStage",
     "ModelVersion",
     "MonitoringError",
+    "OwnershipType",
     "PredictionRequest",
     "PredictionResult",
     "PricePredictorError",

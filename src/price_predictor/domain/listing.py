@@ -1,73 +1,102 @@
-"""The :class:`Listing` aggregate: one scraped Otodom offer."""
+"""The :class:`Listing` aggregate: one apartment record (Kaggle schema)."""
 
 from __future__ import annotations
 
-from datetime import datetime
-from decimal import Decimal
+from datetime import UTC, date, datetime
 from typing import Annotated, Self
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from price_predictor.domain import constants
-from price_predictor.domain.enums import PropertyType
+from price_predictor.domain.enums import (
+    BuildingMaterial,
+    CityEnum,
+    ConditionType,
+    OwnershipType,
+    PropertyType,
+)
 
-NonEmptyStr = Annotated[str, StringConstraints(min_length=1, max_length=120, strip_whitespace=True)]
+NonEmptyStr = Annotated[
+    str, StringConstraints(min_length=1, max_length=120, strip_whitespace=True)
+]
+
+_Distance = Annotated[float, Field(ge=0.0)]
+_OptDistance = Annotated[float | None, Field(default=None, ge=0.0)]
 
 
 class Listing(BaseModel):
-    """A single real-estate offer scraped from Otodom.
+    """One apartment listing from the Kaggle dataset.
 
-    This is the *raw* contract that crosses the scraping -> storage
-    boundary. It is immutable and rejects unknown fields so that schema
-    drift on the source site fails loudly instead of silently widening
-    the model.
-
-    Attributes:
-        listing_id: Stable Otodom offer identifier (primary key).
-        source_url: Canonical URL the record was scraped from.
-        scraped_at: UTC timestamp of capture.
-        price: Asking price in PLN.
-        area: Usable floor area in square metres.
-        rooms: Number of rooms.
-        city: City the property is located in.
-        district: District / neighbourhood within the city.
-        year_built: Year of construction (or planned completion).
-        floor: Floor index; ``0`` is ground, negatives are souterrain.
-        property_type: Dwelling category.
+    Immutable and ``extra='forbid'`` so dataset drift fails loudly.
+    Nullable fields mirror the dataset's documented missingness; values
+    are not invented.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid", str_strip_whitespace=True)
 
-    listing_id: NonEmptyStr
-    source_url: Annotated[str, Field(min_length=1, max_length=2048)]
-    scraped_at: datetime
+    id: NonEmptyStr
+    city: CityEnum
+    property_type: PropertyType | None = None
 
-    price: Annotated[
-        Decimal,
-        Field(ge=constants.PRICE_MIN_PLN, le=constants.PRICE_MAX_PLN, decimal_places=2),
+    square_meters: Annotated[
+        float,
+        Field(
+            ge=constants.SQUARE_METERS_MIN,
+            le=constants.SQUARE_METERS_MAX,
+        ),
     ]
-    area: Annotated[float, Field(ge=constants.AREA_MIN_SQM, le=constants.AREA_MAX_SQM)]
     rooms: Annotated[int, Field(ge=constants.ROOMS_MIN, le=constants.ROOMS_MAX)]
-    city: NonEmptyStr
-    district: NonEmptyStr
-    year_built: Annotated[int, Field(ge=constants.YEAR_BUILT_MIN)]
-    floor: Annotated[int, Field(ge=constants.FLOOR_MIN, le=constants.FLOOR_MAX)]
-    property_type: PropertyType
+    floor: Annotated[
+        int | None, Field(default=None, ge=constants.FLOOR_MIN, le=constants.FLOOR_MAX)
+    ]
+    floor_count: Annotated[int | None, Field(default=None, ge=0, le=constants.FLOOR_MAX)]
+    build_year: Annotated[
+        int | None, Field(default=None, ge=constants.BUILD_YEAR_MIN)
+    ]
+
+    latitude: Annotated[
+        float, Field(ge=constants.LATITUDE_MIN, le=constants.LATITUDE_MAX)
+    ]
+    longitude: Annotated[
+        float, Field(ge=constants.LONGITUDE_MIN, le=constants.LONGITUDE_MAX)
+    ]
+    centre_distance_km: _Distance
+
+    poi_count: Annotated[int, Field(ge=0)]
+    school_distance_km: _OptDistance
+    clinic_distance_km: _OptDistance
+    post_office_distance_km: _OptDistance
+    kindergarten_distance_km: _OptDistance
+    restaurant_distance_km: _OptDistance
+    college_distance_km: _OptDistance
+    pharmacy_distance_km: _OptDistance
+
+    ownership: OwnershipType
+    building_material: BuildingMaterial | None = None
+    condition: ConditionType | None = None
+
+    has_parking: bool
+    has_balcony: bool
+    has_elevator: bool | None = None
+    has_security: bool
+    has_storage: bool
+
+    price_pln: Annotated[
+        int, Field(ge=constants.PRICE_MIN_PLN, le=constants.PRICE_MAX_PLN)
+    ]
+    snapshot_month: date
 
     @model_validator(mode="after")
-    def _year_not_implausibly_future(self) -> Self:
-        """Reject construction years far past the capture date.
-
-        Primary-market offers are sold before completion, so a small
-        forward tolerance is allowed; anything beyond it is scrape noise.
-        """
-        ceiling = self.scraped_at.year + constants.YEAR_BUILT_FUTURE_TOLERANCE
-        if self.year_built > ceiling:
-            msg = f"year_built {self.year_built} exceeds plausible ceiling {ceiling}"
-            raise ValueError(msg)
+    def _build_year_not_future(self) -> Self:
+        """Reject construction years after the current year."""
+        if self.build_year is not None:
+            ceiling = datetime.now(UTC).year
+            if self.build_year > ceiling:
+                msg = f"build_year {self.build_year} exceeds current year {ceiling}"
+                raise ValueError(msg)
         return self
 
     @property
-    def price_per_sqm(self) -> Decimal:
-        """Asking price per square metre in PLN."""
-        return (self.price / Decimal(str(self.area))).quantize(Decimal("0.01"))
+    def price_per_sqm(self) -> float:
+        """Price per square metre in PLN."""
+        return round(self.price_pln / self.square_meters, 2)
