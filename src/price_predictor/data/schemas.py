@@ -34,28 +34,16 @@ class RawListingSchema(pa.DataFrameModel):
     # Not unique: monthly snapshots re-observe the same listing id.
     id: Series[str] = pa.Field(nullable=False)
     city: Series[str] = pa.Field(isin=_values(CityEnum), nullable=False)
-    property_type: Series[str] = pa.Field(
-        isin=_values(PropertyType), nullable=True
-    )
+    property_type: Series[str] = pa.Field(isin=_values(PropertyType), nullable=True)
     square_meters: Series[float] = pa.Field(
         ge=constants.SQUARE_METERS_MIN, le=constants.SQUARE_METERS_MAX
     )
     rooms: Series[int] = pa.Field(ge=constants.ROOMS_MIN, le=constants.ROOMS_MAX)
-    floor: Series[int] = pa.Field(
-        ge=constants.FLOOR_MIN, le=constants.FLOOR_MAX, nullable=True
-    )
-    floor_count: Series[int] = pa.Field(
-        ge=0, le=constants.FLOOR_MAX, nullable=True
-    )
-    build_year: Series[int] = pa.Field(
-        ge=constants.BUILD_YEAR_MIN, nullable=True
-    )
-    latitude: Series[float] = pa.Field(
-        ge=constants.LATITUDE_MIN, le=constants.LATITUDE_MAX
-    )
-    longitude: Series[float] = pa.Field(
-        ge=constants.LONGITUDE_MIN, le=constants.LONGITUDE_MAX
-    )
+    floor: Series[int] = pa.Field(ge=constants.FLOOR_MIN, le=constants.FLOOR_MAX, nullable=True)
+    floor_count: Series[int] = pa.Field(ge=0, le=constants.FLOOR_MAX, nullable=True)
+    build_year: Series[int] = pa.Field(ge=constants.BUILD_YEAR_MIN, nullable=True)
+    latitude: Series[float] = pa.Field(ge=constants.LATITUDE_MIN, le=constants.LATITUDE_MAX)
+    longitude: Series[float] = pa.Field(ge=constants.LONGITUDE_MIN, le=constants.LONGITUDE_MAX)
     centre_distance_km: Series[float] = pa.Field(ge=0.0)
     poi_count: Series[int] = pa.Field(ge=0)
     school_distance_km: Series[float] = pa.Field(ge=0.0, nullable=True)
@@ -65,23 +53,15 @@ class RawListingSchema(pa.DataFrameModel):
     restaurant_distance_km: Series[float] = pa.Field(ge=0.0, nullable=True)
     college_distance_km: Series[float] = pa.Field(ge=0.0, nullable=True)
     pharmacy_distance_km: Series[float] = pa.Field(ge=0.0, nullable=True)
-    ownership: Series[str] = pa.Field(
-        isin=_values(OwnershipType), nullable=False
-    )
-    building_material: Series[str] = pa.Field(
-        isin=_values(BuildingMaterial), nullable=True
-    )
-    condition: Series[str] = pa.Field(
-        isin=_values(ConditionType), nullable=True
-    )
+    ownership: Series[str] = pa.Field(isin=_values(OwnershipType), nullable=False)
+    building_material: Series[str] = pa.Field(isin=_values(BuildingMaterial), nullable=True)
+    condition: Series[str] = pa.Field(isin=_values(ConditionType), nullable=True)
     has_parking: Series[bool] = pa.Field(nullable=False)
     has_balcony: Series[bool] = pa.Field(nullable=False)
     has_elevator: Series[bool] = pa.Field(nullable=True)
     has_security: Series[bool] = pa.Field(nullable=False)
     has_storage: Series[bool] = pa.Field(nullable=False)
-    price_pln: Series[int] = pa.Field(
-        ge=constants.PRICE_MIN_PLN, le=constants.PRICE_MAX_PLN
-    )
+    price_pln: Series[int] = pa.Field(ge=constants.PRICE_MIN_PLN, le=constants.PRICE_MAX_PLN)
     snapshot_month: Series[str] = pa.Field(nullable=False)
 
     class Config:

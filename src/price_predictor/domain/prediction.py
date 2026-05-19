@@ -41,15 +41,9 @@ class PredictionRequest(BaseModel):
         int | None, Field(default=None, ge=constants.FLOOR_MIN, le=constants.FLOOR_MAX)
     ]
     floor_count: Annotated[int | None, Field(default=None, ge=0, le=constants.FLOOR_MAX)]
-    build_year: Annotated[
-        int | None, Field(default=None, ge=constants.BUILD_YEAR_MIN)
-    ]
-    latitude: Annotated[
-        float, Field(ge=constants.LATITUDE_MIN, le=constants.LATITUDE_MAX)
-    ]
-    longitude: Annotated[
-        float, Field(ge=constants.LONGITUDE_MIN, le=constants.LONGITUDE_MAX)
-    ]
+    build_year: Annotated[int | None, Field(default=None, ge=constants.BUILD_YEAR_MIN)]
+    latitude: Annotated[float, Field(ge=constants.LATITUDE_MIN, le=constants.LATITUDE_MAX)]
+    longitude: Annotated[float, Field(ge=constants.LONGITUDE_MIN, le=constants.LONGITUDE_MAX)]
     centre_distance_km: Annotated[float, Field(ge=0.0)]
     poi_count: Annotated[int, Field(ge=0)]
     school_distance_km: _OptDist

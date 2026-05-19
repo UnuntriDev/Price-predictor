@@ -27,20 +27,14 @@ def test_valid_frame_passes_through() -> None:
 @pytest.mark.parametrize(
     "mutate",
     [
-        pytest.param(
-            lambda f: f.with_columns(price_pln=pl.lit(0)), id="price-too-low"
-        ),
+        pytest.param(lambda f: f.with_columns(price_pln=pl.lit(0)), id="price-too-low"),
         pytest.param(
             lambda f: f.with_columns(square_meters=pl.lit(5.0)),
             id="square-meters-low",
         ),
         pytest.param(lambda f: f.drop("rooms"), id="missing-column"),
-        pytest.param(
-            lambda f: f.with_columns(extra=pl.lit(1)), id="extra-column-strict"
-        ),
-        pytest.param(
-            lambda f: f.with_columns(city=pl.lit("berlin")), id="bad-city-enum"
-        ),
+        pytest.param(lambda f: f.with_columns(extra=pl.lit(1)), id="extra-column-strict"),
+        pytest.param(lambda f: f.with_columns(city=pl.lit("berlin")), id="bad-city-enum"),
         pytest.param(
             lambda f: f.with_columns(latitude=pl.lit(70.0)),
             id="latitude-out-of-poland",

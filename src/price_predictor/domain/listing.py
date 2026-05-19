@@ -16,9 +16,7 @@ from price_predictor.domain.enums import (
     PropertyType,
 )
 
-NonEmptyStr = Annotated[
-    str, StringConstraints(min_length=1, max_length=120, strip_whitespace=True)
-]
+NonEmptyStr = Annotated[str, StringConstraints(min_length=1, max_length=120, strip_whitespace=True)]
 
 _Distance = Annotated[float, Field(ge=0.0)]
 _OptDistance = Annotated[float | None, Field(default=None, ge=0.0)]
@@ -50,16 +48,10 @@ class Listing(BaseModel):
         int | None, Field(default=None, ge=constants.FLOOR_MIN, le=constants.FLOOR_MAX)
     ]
     floor_count: Annotated[int | None, Field(default=None, ge=0, le=constants.FLOOR_MAX)]
-    build_year: Annotated[
-        int | None, Field(default=None, ge=constants.BUILD_YEAR_MIN)
-    ]
+    build_year: Annotated[int | None, Field(default=None, ge=constants.BUILD_YEAR_MIN)]
 
-    latitude: Annotated[
-        float, Field(ge=constants.LATITUDE_MIN, le=constants.LATITUDE_MAX)
-    ]
-    longitude: Annotated[
-        float, Field(ge=constants.LONGITUDE_MIN, le=constants.LONGITUDE_MAX)
-    ]
+    latitude: Annotated[float, Field(ge=constants.LATITUDE_MIN, le=constants.LATITUDE_MAX)]
+    longitude: Annotated[float, Field(ge=constants.LONGITUDE_MIN, le=constants.LONGITUDE_MAX)]
     centre_distance_km: _Distance
 
     poi_count: Annotated[int, Field(ge=0)]
@@ -81,9 +73,7 @@ class Listing(BaseModel):
     has_security: bool
     has_storage: bool
 
-    price_pln: Annotated[
-        int, Field(ge=constants.PRICE_MIN_PLN, le=constants.PRICE_MAX_PLN)
-    ]
+    price_pln: Annotated[int, Field(ge=constants.PRICE_MIN_PLN, le=constants.PRICE_MAX_PLN)]
     snapshot_month: date
 
     @model_validator(mode="after")
