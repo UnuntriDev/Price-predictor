@@ -1,8 +1,11 @@
-"""Scraping layer: spider, __NEXT_DATA__ parser, pipeline, runner."""
+"""Scraping layer: illustrative skeleton only (ADR 0013/0014).
+
+Inactive in the data pipeline. The data source is the Kaggle dataset
+(see :mod:`price_predictor.data.kaggle`).
+"""
 
 from __future__ import annotations
 
-from price_predictor.scraping.parser import extract_next_data, parse_listing
 from price_predictor.scraping.pipelines import ListingValidationPipeline
 from price_predictor.scraping.ports import ScrapeRunner
 from price_predictor.scraping.runner import ScrapyRunner
@@ -13,6 +16,4 @@ __all__ = [
     "OtodomSpider",
     "ScrapeRunner",
     "ScrapyRunner",
-    "extract_next_data",
-    "parse_listing",
 ]

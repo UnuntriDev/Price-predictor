@@ -1,31 +1,22 @@
-"""``make scrape`` entrypoint.
+"""``make scrape`` entrypoint (inactive).
 
-Builds the Scrapy runner from settings (with Postgres persistence wired)
-and runs the crawl. Requires Chromium (`make browsers`) and a reachable
-Postgres; failures are reported cleanly instead of crashing.
+Otodom scraping is disabled (DataDome anti-bot; ADR 0013 superseded by
+ADR 0014). The data source is the Kaggle dataset — use ``make data``.
+This wrapper reports that clearly instead of attempting a crawl.
 """
 
 from __future__ import annotations
 
 import sys
 
-from price_predictor.config import configure_logging, get_settings
-from price_predictor.domain import PricePredictorError
-from price_predictor.scraping import ScrapyRunner
-
 
 def main() -> int:
-    """Construct the crawl runner and run it, persisting to Postgres."""
-    settings = get_settings()
-    configure_logging(settings.logging)
-    runner = ScrapyRunner(settings.scraping, postgres=settings.postgres)
-    try:
-        count = runner.run()
-    except PricePredictorError as exc:
-        sys.stdout.write(f"[scrape] failed: {exc}\n")
-        return 2
-    sys.stdout.write(f"[scrape] captured {count} listings\n")
-    return 0
+    """Explain that scraping is inactive and point to `make data`."""
+    sys.stdout.write(
+        "[scrape] disabled: Otodom DataDome anti-bot (ADR 0013/0014).\n"
+        "[scrape] the data source is the Kaggle dataset - run `make data`.\n"
+    )
+    return 2
 
 
 if __name__ == "__main__":
