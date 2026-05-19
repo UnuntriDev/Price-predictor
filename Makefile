@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-.PHONY: help install lint format type test check pre-commit \
+.PHONY: help install browsers lint format type test check pre-commit \
         up down serve ui train scrape clean
 
 help: ## Show this help
@@ -10,6 +10,9 @@ help: ## Show this help
 
 install: ## Create the locked virtual environment
 	uv sync
+
+browsers: ## Install the Chromium browser for the scraper (Playwright)
+	uv run playwright install chromium
 
 lint: ## Ruff lint
 	uv run ruff check .
@@ -46,7 +49,7 @@ ui: ## Run the Streamlit demo
 train: ## Train a model (Phase 2)
 	uv run python scripts/train.py
 
-scrape: ## Run the Otodom crawl (Phase 2)
+scrape: browsers ## Run the Otodom crawl (needs Chromium via `make browsers`)
 	uv run python scripts/scrape.py
 
 clean: ## Remove caches and build artifacts

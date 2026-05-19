@@ -111,8 +111,10 @@ model and the Pandera frame schema so they cannot drift.
 
 Design decisions are locked in [ADRs 0006–0011](docs/decisions/):
 
-- **Scraping** — Playwright render, extract from `__NEXT_DATA__` JSON
-  (not DOM selectors); validate via the Pandera `ListingFrame`.
+- **Scraping** — scrapy-playwright render, extract from `__NEXT_DATA__`
+  JSON (not DOM selectors); validate via the Pandera `ListingFrame`.
+  Run `make browsers` once (`playwright install chromium`) before
+  `make scrape`.
 - **Features** — canonical district dictionary with out-of-fold target
   encoding fallback; engineered features feed `PriceFeaturePipeline`.
 - **Training** — Optuna + MLflow logging; **conformal** prediction
