@@ -1,23 +1,89 @@
-"""Evidently-backed drift detector (skeleton)."""
+"""Statistical data-drift detector (ADR 0012).
+
+Per-feature two-sample comparison of a current window against a
+reference window: Kolmogorov-Smirnov for numeric columns, Population
+Stability Index for categorical columns. Deterministic and dependency-
+stable; Evidently is used elsewhere only for human-facing HTML reports.
+"""
 
 from __future__ import annotations
 
-import polars as pl
+from datetime import UTC, datetime
 
+import numpy as np
+import polars as pl
+from scipy.stats import ks_2samp
+
+from price_predictor.domain import MonitoringError
 from price_predictor.monitoring.report import DriftReport
 
+_PSI_EPS = 1e-6
 
-class EvidentlyDriftDetector:
-    """Detects data drift with Evidently presets.
+
+def _psi(reference: pl.Series, current: pl.Series) -> float:
+    """Population Stability Index over the union of observed categories."""
+    ref_share = reference.value_counts(normalize=True)
+    cur_share = current.value_counts(normalize=True)
+    col = reference.name
+    ref_map = dict(zip(ref_share[col], ref_share["proportion"], strict=True))
+    cur_map = dict(zip(cur_share[col], cur_share["proportion"], strict=True))
+    psi = 0.0
+    for category in set(ref_map) | set(cur_map):
+        r = ref_map.get(category, 0.0) + _PSI_EPS
+        c = cur_map.get(category, 0.0) + _PSI_EPS
+        psi += (c - r) * np.log(c / r)
+    return float(psi)
+
+
+class StatisticalDriftDetector:
+    """KS (numeric) + PSI (categorical) drift detector.
 
     Args:
-        p_value_threshold: Significance level below which a feature is
+        p_value_threshold: KS p-value below which a numeric feature is
             flagged as drifted.
+        psi_threshold: PSI above which a categorical feature is flagged
+            (0.2 is the common "moderate shift" rule of thumb).
+        dataset_drift_share: Fraction of drifted features at/above which
+            the dataset as a whole is declared drifted.
     """
 
-    def __init__(self, p_value_threshold: float) -> None:
-        self._p_value_threshold = p_value_threshold
+    def __init__(
+        self,
+        p_value_threshold: float,
+        psi_threshold: float = 0.2,
+        dataset_drift_share: float = 0.5,
+    ) -> None:
+        self._p = p_value_threshold
+        self._psi_threshold = psi_threshold
+        self._dataset_share = dataset_drift_share
 
     def detect(self, reference: pl.DataFrame, current: pl.DataFrame) -> DriftReport:
-        """See :meth:`DriftDetector.detect`."""
-        raise NotImplementedError("Phase 2: run Evidently DataDriftPreset -> DriftReport")
+        """See :meth:`DriftDetector.detect`.
+
+        Raises:
+            MonitoringError: If the frames share no columns or are empty.
+        """
+        shared = [c for c in reference.columns if c in current.columns]
+        if not shared or reference.height == 0 or current.height == 0:
+            msg = "drift detection needs non-empty frames with shared columns"
+            raise MonitoringError(msg)
+
+        drifted: list[str] = []
+        for col in shared:
+            if reference[col].dtype.is_numeric():
+                stat = ks_2samp(
+                    reference[col].drop_nulls().to_numpy(),
+                    current[col].drop_nulls().to_numpy(),
+                )
+                if float(stat.pvalue) < self._p:
+                    drifted.append(col)
+            elif _psi(reference[col], current[col]) > self._psi_threshold:
+                drifted.append(col)
+
+        share = len(drifted) / len(shared)
+        return DriftReport(
+            dataset_drift=share >= self._dataset_share,
+            drifted_features=tuple(drifted),
+            share_drifted=share,
+            generated_at=datetime.now(UTC),
+        )
