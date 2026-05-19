@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 
 .PHONY: help install browsers lint format type test check pre-commit \
-        up down serve ui train scrape clean
+        up down serve ui train scrape drift clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -51,6 +51,9 @@ train: ## Train+register a model from the listings in Postgres
 
 scrape: browsers ## Run the Otodom crawl (needs Chromium via `make browsers`)
 	uv run python scripts/scrape.py
+
+drift: ## Drift gate + Evidently HTML report from Postgres listings
+	uv run python -m price_predictor.monitoring.job
 
 clean: ## Remove caches and build artifacts
 	rm -rf .ruff_cache .mypy_cache .pytest_cache htmlcov .coverage \

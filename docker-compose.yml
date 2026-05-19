@@ -89,6 +89,27 @@ services:
     ports:
       - "3000:3000"
 
+  # On-demand drift job: `docker compose --profile tools run --rm evidently`.
+  # Reuses the API image (package + configs baked in) and writes the
+  # HTML report to ./artifacts on the host.
+  evidently:
+    profiles: ["tools"]
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    command:
+      ["python", "-m", "price_predictor.monitoring.job"]
+    environment:
+      PP_ENV: local
+      PP_POSTGRES__HOST: postgres
+      PP_POSTGRES__PASSWORD: ${PP_POSTGRES__PASSWORD:-change-me}
+      PP_ARTIFACTS_DIR: /app/artifacts
+    volumes:
+      - ./artifacts:/app/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   pgdata:
   mlruns:
