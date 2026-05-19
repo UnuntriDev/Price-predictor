@@ -46,7 +46,7 @@ ui: ## Run the Streamlit demo
 	uv run streamlit run src/price_predictor/ui/streamlit_app.py \
 		--server.port 7860
 
-train: ## Train a model (Phase 2)
+train: ## Train+register a model from the listings in Postgres
 	uv run python scripts/train.py
 
 scrape: browsers ## Run the Otodom crawl (needs Chromium via `make browsers`)
