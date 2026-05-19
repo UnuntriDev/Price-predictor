@@ -7,9 +7,12 @@ and drift monitoring. Built to portfolio quality: strict typing,
 Protocol-first interfaces, dependency injection, and a reproducible
 toolchain.
 
-> **Status: Phase 1 — skeleton.** Every module exposes typed interfaces
-> and contracts; behaviour raises `NotImplementedError("Phase 2: ...")`.
-> The scaffold, quality gate, containers, and CI are real and green.
+> **Status: Phase 2 — implemented.** The full loop runs end to end:
+> `scrape → Postgres → train (+ conformal) → MLflow register → serve
+> /predict → drift gate + Evidently report`. Strict typing, tests, and
+> CI are green. One provisional item: the Otodom `__NEXT_DATA__` key
+> paths are an assumed contract (ADR 0013) pending a real capture —
+> isolated to one function and a swappable fixture.
 
 ---
 
@@ -107,26 +110,38 @@ tests/unit + tests/integration   mirror src/
 Sanity bounds live in `domain.constants` and are shared by the Pydantic
 model and the Pandera frame schema so they cannot drift.
 
-## Phase 2 roadmap
+## Phase 2 — implemented
 
-Design decisions are locked in [ADRs 0006–0011](docs/decisions/):
+Design decisions are recorded in [ADRs 0006–0013](docs/decisions/).
+Run the loop:
+
+```bash
+make browsers          # Chromium for the scraper (once)
+make up                # pg / mlflow / prometheus / grafana / api / ui
+make scrape            # Otodom → __NEXT_DATA__ → validate → Postgres
+make train             # Postgres → features → fit → conformal → MLflow
+make serve             # /predict: price + conformal interval
+make drift             # KS+PSI gate + Evidently HTML report
+```
 
 - **Scraping** — scrapy-playwright render, extract from `__NEXT_DATA__`
-  JSON (not DOM selectors); validate via the Pandera `ListingFrame`.
-  Run `make browsers` once (`playwright install chromium`) before
-  `make scrape`.
-- **Features** — canonical district dictionary with out-of-fold target
-  encoding fallback; engineered features feed `PriceFeaturePipeline`.
-- **Training** — Optuna + MLflow logging; **conformal** prediction
-  intervals around the boosting regressor.
+  (not DOM selectors), Pandera-validated, batched upsert into Postgres.
+- **Features** — canonical district dictionary + smoothed target
+  encoding; leakage-aware (no price-derived inputs).
+- **Training** — `run_training` orchestrates validate→split→features→
+  fit→**conformal**→evaluate→MLflow `log_and_register`; Optuna tuner.
 - **Registry** — manual promotion gate with an automated
-  promote/hold recommendation.
-- **Data** — S3-compatible DVC remote (MinIO local / AWS S3 prod;
-  GDrive documented fallback).
-- **Serving** — real `/predict`; the HF Space pulls the production
-  model from the remote MLflow registry at startup.
-- Evidently drift job · Streamlit form calling the API · integration
-  tests against the compose services.
+  `recommend_promotion` (promote/hold + metric delta).
+- **Serving** — real `/predict` returns price + conformal interval;
+  the artifact is loaded from the registry at startup.
+- **Monitoring** — KS+PSI drift gate (deterministic) plus the Evidently
+  HTML report job (ADR 0012).
+
+**Provisional:** the Otodom `__NEXT_DATA__` key paths are an assumed
+contract (ADR 0013), exercised against a swappable synthetic fixture
+until a real capture is supplied. **Not wired:** DVC remote (ADR 0009)
+and the HF-Space-pulls-from-remote-registry deploy (ADR 0011) remain
+infra follow-ups.
 
 ## License
 
