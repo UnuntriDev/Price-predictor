@@ -55,7 +55,10 @@ services:
       - "5432:5432"
 
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.17.0
+    build:
+      context: .
+      dockerfile: docker/mlflow.Dockerfile
+    image: price-predictor-mlflow
     command: >
       mlflow server
       --host 0.0.0.0 --port 5000

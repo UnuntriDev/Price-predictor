@@ -1,7 +1,7 @@
 """Evaluation report contract.
 
 A frozen Pydantic model so a training run's scores serialise verbatim
-into MLflow and the ``model_versions.metrics`` column.
+into MLflow and the ``registry_model_versions.metrics`` column.
 """
 
 from __future__ import annotations

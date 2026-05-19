@@ -37,3 +37,42 @@ def test_to_domain_maps_mlflow_version() -> None:
     assert mv.version == "7"
     assert mv.stage is ModelStage.STAGING
     assert mv.metrics == {"mae": 1.0}
+
+
+def test_load_model_configures_global_mlflow_uris(monkeypatch) -> None:
+    calls = []
+    model = object()
+
+    def fake_set_tracking_uri(uri):
+        calls.append(("tracking", uri))
+
+    def fake_set_registry_uri(uri):
+        calls.append(("registry", uri))
+
+    def fake_load_model(uri):
+        calls.append(("load", uri))
+        return model
+
+    monkeypatch.setattr(
+        "price_predictor.registry.mlflow_registry.mlflow.set_tracking_uri",
+        fake_set_tracking_uri,
+    )
+    monkeypatch.setattr(
+        "price_predictor.registry.mlflow_registry.mlflow.set_registry_uri",
+        fake_set_registry_uri,
+    )
+    monkeypatch.setattr(
+        "price_predictor.registry.mlflow_registry.mlflow.sklearn.load_model",
+        fake_load_model,
+    )
+
+    registry = MLflowModelRegistry(
+        MLflowSettings(tracking_uri="http://tracking", registry_uri="http://registry")
+    )
+
+    assert registry.load_model("price-predictor", ModelStage.PRODUCTION) is model
+    assert calls == [
+        ("tracking", "http://tracking"),
+        ("registry", "http://registry"),
+        ("load", "models:/price-predictor/Production"),
+    ]

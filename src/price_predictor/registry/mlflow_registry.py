@@ -39,6 +39,12 @@ class MLflowModelRegistry:
             registry_uri=settings.registry_uri or settings.tracking_uri,
         )
 
+    def _configure_global_uris(self) -> None:
+        """Point MLflow flavor APIs at the configured tracking backend."""
+        registry_uri = self._settings.registry_uri or self._settings.tracking_uri
+        mlflow.set_tracking_uri(self._settings.tracking_uri)
+        mlflow.set_registry_uri(registry_uri)
+
     @staticmethod
     def _to_domain(version: Any, metrics: dict[str, float]) -> ModelVersion:
         return ModelVersion(
@@ -65,7 +71,7 @@ class MLflowModelRegistry:
 
     def log_and_register(self, model: Any, name: str, metrics: dict[str, float]) -> ModelVersion:
         """See :meth:`ModelRegistry.log_and_register`."""
-        mlflow.set_tracking_uri(self._settings.tracking_uri)
+        self._configure_global_uris()
         mlflow.set_experiment(self._settings.experiment_name)
         with mlflow.start_run() as run:
             mlflow.log_metrics(metrics)
@@ -95,6 +101,7 @@ class MLflowModelRegistry:
         object is returned intact (its ``conformal_q`` attribute and
         ``predict`` survive the round-trip, unlike a pyfunc wrapper).
         """
+        self._configure_global_uris()
         uri = f"models:/{name}/{_STAGE_TO_MLFLOW[stage]}"
         loaded: Any = mlflow.sklearn.load_model(uri)
         return loaded

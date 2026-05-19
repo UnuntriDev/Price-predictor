@@ -1,4 +1,4 @@
-"""Registry metadata contract: mirrors a row of the ``model_versions`` table."""
+"""Registry metadata contract: mirrors a row of ``registry_model_versions``."""
 
 from __future__ import annotations
 

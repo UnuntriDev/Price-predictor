@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS predictions (
     request         JSONB NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS model_versions (
+CREATE TABLE IF NOT EXISTS registry_model_versions (
     name       TEXT NOT NULL,
     version    TEXT NOT NULL,
     stage      TEXT NOT NULL,
