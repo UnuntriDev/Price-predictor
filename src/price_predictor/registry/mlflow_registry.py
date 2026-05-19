@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import mlflow
+import mlflow.sklearn
 from mlflow.exceptions import MlflowException
 from mlflow.tracking import MlflowClient
 
@@ -62,6 +63,16 @@ class MLflowModelRegistry:
             self._client.set_model_version_tag(name, version.version, f"metric.{key}", value)
         return self._to_domain(version, metrics)
 
+    def log_and_register(self, model: Any, name: str, metrics: dict[str, float]) -> ModelVersion:
+        """See :meth:`ModelRegistry.log_and_register`."""
+        mlflow.set_tracking_uri(self._settings.tracking_uri)
+        mlflow.set_experiment(self._settings.experiment_name)
+        with mlflow.start_run() as run:
+            mlflow.log_metrics(metrics)
+            mlflow.sklearn.log_model(model, name="model")
+            run_id = run.info.run_id
+        return self.register(run_id, name, metrics)
+
     def transition_stage(self, name: str, version: str, stage: ModelStage) -> ModelVersion:
         """See :meth:`ModelRegistry.transition_stage`."""
         updated = self._client.transition_model_version_stage(
@@ -78,6 +89,12 @@ class MLflowModelRegistry:
         return self._to_domain(matches[0], {})
 
     def load_model(self, name: str, stage: ModelStage) -> Any:
-        """See :meth:`ModelRegistry.load_model`."""
+        """See :meth:`ModelRegistry.load_model`.
+
+        Uses the sklearn flavor so the original :class:`ConformalModel`
+        object is returned intact (its ``conformal_q`` attribute and
+        ``predict`` survive the round-trip, unlike a pyfunc wrapper).
+        """
         uri = f"models:/{name}/{_STAGE_TO_MLFLOW[stage]}"
-        return mlflow.pyfunc.load_model(uri)
+        loaded: Any = mlflow.sklearn.load_model(uri)
+        return loaded

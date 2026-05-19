@@ -15,6 +15,10 @@ class ModelRegistry(Protocol):
         """Register the artifact from ``run_id`` and return its version."""
         ...
 
+    def log_and_register(self, model: Any, name: str, metrics: dict[str, float]) -> ModelVersion:
+        """Log ``model`` in a fresh run and register it in one step."""
+        ...
+
     def transition_stage(self, name: str, version: str, stage: ModelStage) -> ModelVersion:
         """Move a version to ``stage`` and return the updated record."""
         ...

@@ -43,7 +43,7 @@ class ConformalRegressor:
 
     def calibrate(
         self,
-        x_cal: npt.NDArray[np.float64],
+        x_cal: Any,
         y_cal: npt.NDArray[np.float64],
     ) -> Self:
         """Compute the conformal quantile from calibration residuals.
@@ -68,7 +68,19 @@ class ConformalRegressor:
         self._q = float(np.quantile(residuals, level, method="higher"))
         return self
 
-    def predict(self, x: npt.NDArray[np.float64]) -> IntervalPrediction:
+    @property
+    def q(self) -> float:
+        """The calibrated conformal half-width.
+
+        Raises:
+            TrainingError: If accessed before :meth:`calibrate`.
+        """
+        if self._q is None:
+            msg = "q accessed before calibrate"
+            raise TrainingError(msg)
+        return self._q
+
+    def predict(self, x: Any) -> IntervalPrediction:
         """Return point predictions with the calibrated band.
 
         Raises:
