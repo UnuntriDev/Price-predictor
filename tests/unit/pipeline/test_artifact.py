@@ -24,18 +24,9 @@ class _EstimatorStub:
 
 
 def _raw(rows: int) -> pd.DataFrame:
-    return pd.DataFrame(
-        {
-            "area": [50.0] * rows,
-            "rooms": [3] * rows,
-            "city": ["Warszawa"] * rows,
-            "district": ["Wola"] * rows,
-            "year_built": [2010] * rows,
-            "floor": [2] * rows,
-            "property_type": ["apartment"] * rows,
-            "extra": ["ignored"] * rows,
-        }
-    )
+    data: dict[str, list[Any]] = {col: [0] * rows for col in REQUEST_COLUMNS}
+    data["extra"] = ["ignored"] * rows
+    return pd.DataFrame(data)
 
 
 def test_predict_and_attribute() -> None:

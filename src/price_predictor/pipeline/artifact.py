@@ -4,8 +4,8 @@
 ``predict`` plus a ``conformal_q`` attribute: the fitted feature
 pipeline, the fitted sklearn estimator pipeline, and the conformal
 half-width. It is cloudpickle-friendly so MLflow can log/load it whole,
-and it accepts the *raw request columns* so the serving layer never has
-to know about feature engineering.
+and it accepts the *raw request feature columns* so the serving layer
+never has to know about feature engineering.
 """
 
 from __future__ import annotations
@@ -15,17 +15,10 @@ from typing import Any
 import numpy.typing as npt
 import polars as pl
 
-from price_predictor.features import PriceFeaturePipeline
+from price_predictor.features import FEATURE_COLUMNS, PriceFeaturePipeline
 
-REQUEST_COLUMNS = (
-    "area",
-    "rooms",
-    "city",
-    "district",
-    "year_built",
-    "floor",
-    "property_type",
-)
+#: Raw input columns a caller must supply (== the modelled features).
+REQUEST_COLUMNS = FEATURE_COLUMNS
 
 
 class ConformalModel:

@@ -40,24 +40,43 @@ class FakeRegistry:
         raise ModelNotFoundError("no production model")
 
 
-def _listings(n: int = 90) -> pl.DataFrame:
+def _listings(n: int = 120) -> pl.DataFrame:
     rng = np.random.default_rng(7)
-    area = rng.uniform(25, 110, n)
+    sqm = rng.uniform(25, 150, n)
     rooms = rng.integers(1, 6, n)
-    cities = rng.choice(["Warszawa", "Krakow", "Gdansk"], n)
-    districts = rng.choice(["Wola", "Mokotow", "Centrum"], n)
-    price = 8_000 * area + 60_000 * rooms + rng.normal(0, 5_000, n) + 50_000
+    centre = rng.uniform(0.5, 12.0, n)
+    price = 9_000 * sqm + 40_000 * rooms - 8_000 * centre + rng.normal(0, 4_000, n)
     return pl.DataFrame(
         {
-            "listing_id": [f"OT-{i}" for i in range(n)],
-            "price": price,
-            "area": area,
+            "id": [f"id-{i}" for i in range(n)],
+            "city": rng.choice(["warszawa", "krakow", "gdansk"], n),
+            "property_type": rng.choice(["blockOfFlats", "tenement"], n),
+            "square_meters": sqm,
             "rooms": rooms,
-            "city": cities,
-            "district": districts,
-            "year_built": rng.integers(1960, 2024, n),
             "floor": rng.integers(0, 12, n),
-            "property_type": ["apartment"] * n,
+            "floor_count": rng.integers(1, 15, n),
+            "build_year": rng.integers(1950, 2024, n),
+            "latitude": rng.uniform(50.0, 54.0, n),
+            "longitude": rng.uniform(15.0, 23.0, n),
+            "centre_distance_km": centre,
+            "poi_count": rng.integers(0, 60, n),
+            "school_distance_km": rng.uniform(0.1, 3.0, n),
+            "clinic_distance_km": rng.uniform(0.1, 3.0, n),
+            "post_office_distance_km": rng.uniform(0.1, 3.0, n),
+            "kindergarten_distance_km": rng.uniform(0.1, 3.0, n),
+            "restaurant_distance_km": rng.uniform(0.1, 3.0, n),
+            "college_distance_km": rng.uniform(0.1, 5.0, n),
+            "pharmacy_distance_km": rng.uniform(0.1, 3.0, n),
+            "ownership": rng.choice(["condominium", "cooperative", "udział"], n),
+            "building_material": rng.choice(["brick", "concreteSlab"], n),
+            "condition": rng.choice(["low", "premium"], n),
+            "has_parking": rng.choice([True, False], n),
+            "has_balcony": rng.choice([True, False], n),
+            "has_elevator": rng.choice([True, False], n),
+            "has_security": rng.choice([True, False], n),
+            "has_storage": rng.choice([True, False], n),
+            "price_pln": np.clip(price, 50_000, 5_000_000).astype(np.int64),
+            "snapshot_month": ["2024-06"] * n,
         }
     )
 
@@ -65,17 +84,15 @@ def _listings(n: int = 90) -> pl.DataFrame:
 def test_end_to_end_run() -> None:
     registry = FakeRegistry()
     result = run_training(
-        _listings(90),
+        _listings(120),
         registry,
         model_name="price-predictor",
-        reference_year=2026,
-        estimator_params={"n_estimators": 60, "max_depth": 3, "verbosity": 0},
+        estimator_params={"n_estimators": 80, "max_depth": 3, "verbosity": 0},
         seed=1,
     )
 
-    # round(90*0.2) == 18 held-out test rows
-    assert result.report.n_samples == 18
-    assert result.report.r2 > 0.5  # strong synthetic signal
+    assert result.report.n_samples == round(120 * 0.2)
+    assert result.report.r2 > 0.5
     assert result.model_version.version == "1"
     assert result.recommendation.should_promote is True
     assert result.recommendation.incumbent is None
@@ -87,28 +104,22 @@ def test_end_to_end_run() -> None:
 
 def test_split_too_small_raises() -> None:
     with pytest.raises(TrainingError, match="cannot split"):
-        run_training(
-            _listings(2),
-            FakeRegistry(),
-            model_name="m",
-            reference_year=2026,
-        )
+        run_training(_listings(2), FakeRegistry(), model_name="m")
 
 
 def test_logged_artifact_predicts_on_raw_request() -> None:
     registry = FakeRegistry()
     run_training(
-        _listings(90),
+        _listings(120),
         registry,
         model_name="m",
-        reference_year=2026,
         estimator_params={"n_estimators": 40, "max_depth": 3, "verbosity": 0},
         seed=2,
     )
     model = registry.logged
     assert isinstance(model, ConformalModel)
 
-    raw = _listings(5).drop("price", "listing_id").to_pandas()
+    raw = _listings(5).to_pandas()
     preds = model.predict(raw)
     assert len(preds) == 5
     assert (preds > 0).all()

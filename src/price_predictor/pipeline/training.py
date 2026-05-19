@@ -38,7 +38,7 @@ from price_predictor.training import (
     build_estimator,
 )
 
-_CATEGORICAL = ["city", "property_type"]
+_CATEGORICAL = ["city", "property_type", "ownership", "building_material", "condition"]
 
 
 class TrainingRunResult(BaseModel):
@@ -71,7 +71,6 @@ def run_training(
     registry: ModelRegistry,
     *,
     model_name: str,
-    reference_year: int,
     estimator_name: str = "xgboost",
     estimator_params: dict[str, Any] | None = None,
     alpha: float = 0.1,
@@ -83,10 +82,9 @@ def run_training(
     """Train, calibrate, register, and recommend in one call.
 
     Args:
-        listings: Raw listings frame (must satisfy ``ListingFrame``).
+        listings: Raw listings frame (must satisfy ``RawListingSchema``).
         registry: Where the artifact is logged + registered.
         model_name: Registered model name.
-        reference_year: Snapshot year for ``building_age``.
         estimator_name: xgboost / lightgbm / catboost.
         estimator_params: Estimator hyper-parameters.
         alpha: Conformal miscoverage rate.
@@ -106,11 +104,11 @@ def run_training(
     train_idx, cal_idx, test_idx = _split(valid.height, test_size, calibration_size, seed)
     train_df, cal_df, test_df = valid[train_idx], valid[cal_idx], valid[test_idx]
 
-    features = PriceFeaturePipeline(reference_year=reference_year).fit(train_df)
+    features = PriceFeaturePipeline().fit(train_df)
 
     def _xy(frame: pl.DataFrame) -> tuple[Any, Any]:
         x = features.transform(frame).to_pandas()
-        y = frame["price"].to_numpy().astype(np.float64)
+        y = frame["price_pln"].to_numpy().astype(np.float64)
         return x, y
 
     x_train, y_train = _xy(train_df)
