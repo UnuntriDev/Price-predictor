@@ -11,10 +11,10 @@ from price_predictor.config.settings import PostgresSettings
 from price_predictor.data import (
     DataFrameStore,
     DuckDBDataFrameStore,
-    ListingFrame,
     ListingRepository,
     PanderaListingValidator,
     PostgresListingRepository,
+    RawListingSchema,
     SchemaContract,
 )
 from price_predictor.domain import StorageError
@@ -30,8 +30,8 @@ def test_adapters_satisfy_ports() -> None:
 
 
 def test_schema_declares_modelled_columns() -> None:
-    columns = set(ListingFrame.to_schema().columns)
-    assert {"price", "area", "rooms", "city", "property_type"} <= columns
+    columns = set(RawListingSchema.to_schema().columns)
+    assert {"price_pln", "square_meters", "city", "snapshot_month"} <= columns
 
 
 def test_repository_wraps_connection_errors() -> None:

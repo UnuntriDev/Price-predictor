@@ -6,12 +6,12 @@ import pandera.errors as pa_errors
 import polars as pl
 import polars.exceptions as pl_errors
 
-from price_predictor.data.schemas import ListingFrame
+from price_predictor.data.schemas import RawListingSchema
 from price_predictor.domain import SchemaValidationError
 
 
 class PanderaListingValidator:
-    """Validates listing frames against :class:`ListingFrame`.
+    """Validates listing frames against :class:`RawListingSchema`.
 
     Pandera's failure modes (wrong dtype, out-of-bound value, missing or
     extra column, duplicate id) are aggregated with ``lazy=True`` and
@@ -19,7 +19,7 @@ class PanderaListingValidator:
     how to catch.
     """
 
-    schema: type[ListingFrame] = ListingFrame
+    schema: type[RawListingSchema] = RawListingSchema
 
     def validate(self, frame: pl.DataFrame) -> pl.DataFrame:
         """See :meth:`SchemaContract.validate`.
@@ -34,7 +34,7 @@ class PanderaListingValidator:
             SchemaValidationError: If ``frame`` violates the contract.
         """
         try:
-            validated: pl.DataFrame = ListingFrame.validate(frame, lazy=True)
+            validated: pl.DataFrame = RawListingSchema.validate(frame, lazy=True)
         except (
             pa_errors.SchemaError,
             pa_errors.SchemaErrors,
