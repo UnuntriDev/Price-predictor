@@ -1,0 +1,19 @@
+{
+  "props": {
+    "pageProps": {
+      "ad": {
+        "id": 123456,
+        "url": "https://www.otodom.pl/pl/oferta/123456",
+        "category": { "name": "Mieszkanie" },
+        "location": { "city": "Warszawa", "district": "Mokotów" },
+        "characteristics": {
+          "price": 750000,
+          "area": 52.5,
+          "rooms_num": 3,
+          "year_built": 2015,
+          "floor_no": 4
+        }
+      }
+    }
+  }
+}

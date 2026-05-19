@@ -140,6 +140,7 @@ files = ["src"]
 [[tool.mypy.overrides]]
 module = [
     "scrapy.*",
+    "parsel.*",
     "mlflow.*",
     "shap.*",
     "xgboost.*",
