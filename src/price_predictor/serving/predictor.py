@@ -1,9 +1,45 @@
-"""Registry-backed predictor (skeleton)."""
+"""Registry-backed predictor.
+
+Loads a model once from the registry (lazy, then cached) and serves
+predictions. The loaded model is expected to be a full pipeline that
+accepts the raw request fields; serving therefore stays decoupled from
+feature engineering. If the model carries a conformal half-width under
+the ``conformal_q`` attribute, it is turned into a prediction interval.
+"""
 
 from __future__ import annotations
 
-from price_predictor.domain import ModelStage, PredictionRequest, PredictionResult
+from datetime import UTC, datetime
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Any
+
+import polars as pl
+
+from price_predictor.config import get_logger
+from price_predictor.domain import (
+    ModelNotLoadedError,
+    ModelStage,
+    PredictionRequest,
+    PredictionResult,
+    PricePredictorError,
+)
 from price_predictor.registry.ports import ModelRegistry
+
+_log = get_logger(__name__)
+
+_REQUEST_COLUMNS = (
+    "area",
+    "rooms",
+    "city",
+    "district",
+    "year_built",
+    "floor",
+    "property_type",
+)
+
+
+def _money(value: float) -> Decimal:
+    return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 class ModelBackedPredictor:
@@ -25,9 +61,35 @@ class ModelBackedPredictor:
         self._registry = registry
         self._model_name = model_name
         self._stage = stage
+        self._model: Any | None = None
+        self._version: str = "unknown"
+
+    def _ensure_loaded(self) -> Any:
+        if self._model is None:
+            try:
+                self._model = self._registry.load_model(self._model_name, self._stage)
+                self._version = self._registry.get_version(self._model_name, self._stage).version
+            except PricePredictorError as exc:
+                msg = f"could not load '{self._model_name}'@{self._stage.value}"
+                raise ModelNotLoadedError(msg) from exc
+            _log.info("model.loaded", name=self._model_name, version=self._version)
+        return self._model
 
     def predict(self, request: PredictionRequest) -> PredictionResult:
         """See :meth:`PredictorService.predict`."""
-        raise NotImplementedError(
-            "Phase 2: load model from registry, run inference -> PredictionResult"
+        model = self._ensure_loaded()
+        frame = pl.DataFrame({col: [getattr(request, col)] for col in _REQUEST_COLUMNS})
+        point = float(model.predict(frame.to_pandas())[0])
+
+        half = getattr(model, "conformal_q", None)
+        low = _money(point - float(half)) if half is not None else None
+        high = _money(point + float(half)) if half is not None else None
+
+        return PredictionResult(
+            predicted_price=_money(point),
+            interval_low=low,
+            interval_high=high,
+            model_name=self._model_name,
+            model_version=self._version,
+            predicted_at=datetime.now(UTC),
         )

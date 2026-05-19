@@ -1,54 +1,72 @@
-"""The FastAPI surface is live for ops; /predict 501s until Phase 2."""
+"""FastAPI surface: ops live, /predict delegates to the injected service."""
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from decimal import Decimal
+
 from fastapi.testclient import TestClient
 
-from price_predictor.config.settings import APISettings, MLflowSettings
-from price_predictor.domain import ModelStage
-from price_predictor.registry import MLflowModelRegistry
+from price_predictor.config.settings import APISettings
+from price_predictor.domain import (
+    ModelNotLoadedError,
+    PredictionRequest,
+    PredictionResult,
+)
 from price_predictor.serving import create_app, get_app
-from price_predictor.serving.predictor import ModelBackedPredictor
+
+_PAYLOAD = {
+    "area": 55.0,
+    "rooms": 3,
+    "city": "Warszawa",
+    "district": "Wola",
+    "year_built": 2018,
+    "floor": 5,
+    "property_type": "apartment",
+}
 
 
-def _client() -> TestClient:
-    predictor = ModelBackedPredictor(
-        MLflowModelRegistry(MLflowSettings()),
-        model_name="price-predictor",
-        stage=ModelStage.PRODUCTION,
-    )
-    return TestClient(create_app(predictor))
+class _OkPredictor:
+    def predict(self, request: PredictionRequest) -> PredictionResult:
+        assert isinstance(request, PredictionRequest)
+        return PredictionResult(
+            predicted_price=Decimal("612345.00"),
+            model_name="price-predictor",
+            model_version="3",
+            predicted_at=datetime(2026, 5, 19, tzinfo=UTC),
+        )
+
+
+class _UnavailablePredictor:
+    def predict(self, request: PredictionRequest) -> PredictionResult:
+        raise ModelNotLoadedError("no production model")
 
 
 def test_health_ok() -> None:
-    resp = _client().get("/health")
+    resp = TestClient(create_app(_OkPredictor())).get("/health")
     assert resp.status_code == 200
     assert resp.json()["status"] == "ok"
 
 
 def test_metrics_exposed() -> None:
-    resp = _client().get("/metrics")
+    resp = TestClient(create_app(_OkPredictor())).get("/metrics")
     assert resp.status_code == 200
     assert "price_predictor_prediction_requests_total" in resp.text
 
 
-def test_predict_returns_501_until_phase2() -> None:
-    payload = {
-        "area": 55.0,
-        "rooms": 3,
-        "city": "Warszawa",
-        "district": "Wola",
-        "year_built": 2018,
-        "floor": 5,
-        "property_type": "apartment",
-    }
-    resp = _client().post("/predict", json=payload)
-    assert resp.status_code == 501
-    assert "Phase 2" in resp.json()["detail"]
+def test_predict_ok() -> None:
+    resp = TestClient(create_app(_OkPredictor())).post("/predict", json=_PAYLOAD)
+    assert resp.status_code == 200
+    assert resp.json()["predicted_price"] == "612345.00"
+
+
+def test_predict_model_unavailable_returns_503() -> None:
+    resp = TestClient(create_app(_UnavailablePredictor())).post("/predict", json=_PAYLOAD)
+    assert resp.status_code == 503
 
 
 def test_predict_rejects_invalid_payload() -> None:
-    resp = _client().post("/predict", json={"area": -1})
+    resp = TestClient(create_app(_OkPredictor())).post("/predict", json={"area": -1})
     assert resp.status_code == 422
 
 

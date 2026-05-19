@@ -7,6 +7,8 @@ production wiring lives in one composition root.
 
 from __future__ import annotations
 
+import time
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
@@ -20,6 +22,10 @@ from price_predictor.domain import (
     PricePredictorError,
     ServingError,
 )
+from price_predictor.monitoring.metrics import (
+    PREDICTION_LATENCY,
+    PREDICTION_REQUESTS,
+)
 from price_predictor.serving.ports import PredictorService
 from price_predictor.serving.schemas import HealthResponse
 
@@ -29,6 +35,8 @@ _HTTP_NOT_IMPLEMENTED = 501
 _HTTP_UNPROCESSABLE = 422
 _HTTP_SERVICE_UNAVAILABLE = 503
 _HTTP_INTERNAL = 500
+
+_OUTCOMES = ("ok", "error")
 
 
 def create_app(predictor: PredictorService) -> FastAPI:
@@ -41,6 +49,9 @@ def create_app(predictor: PredictorService) -> FastAPI:
         A configured :class:`fastapi.FastAPI` instance.
     """
     app = FastAPI(title="PricePredictor API", version=__version__)
+    # Initialise label series so /metrics exposes them before any request.
+    for outcome in _OUTCOMES:
+        PREDICTION_REQUESTS.labels(outcome=outcome)
 
     @app.get("/health", response_model=HealthResponse, tags=["ops"])
     async def health() -> HealthResponse:
@@ -52,7 +63,15 @@ def create_app(predictor: PredictorService) -> FastAPI:
 
     @app.post("/predict", response_model=PredictionResult, tags=["inference"])
     async def predict(payload: PredictionRequest) -> PredictionResult:
-        return predictor.predict(payload)
+        start = time.perf_counter()
+        try:
+            result = predictor.predict(payload)
+        except Exception:
+            PREDICTION_REQUESTS.labels(outcome="error").inc()
+            raise
+        PREDICTION_REQUESTS.labels(outcome="ok").inc()
+        PREDICTION_LATENCY.observe(time.perf_counter() - start)
+        return result
 
     _register_error_handlers(app)
     return app
