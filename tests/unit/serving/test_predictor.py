@@ -8,22 +8,29 @@ from typing import Any
 import pytest
 
 from price_predictor.domain import (
+    CityEnum,
     ModelNotLoadedError,
     ModelStage,
     ModelVersion,
+    OwnershipType,
     PredictionRequest,
     RegistryError,
 )
 from price_predictor.serving.predictor import ModelBackedPredictor
 
 _REQUEST = PredictionRequest(
-    area=55.0,
+    city=CityEnum.WARSZAWA,
+    square_meters=55.0,
     rooms=3,
-    city="Warszawa",
-    district="Wola",
-    year_built=2018,
-    floor=5,
-    property_type="apartment",
+    latitude=52.23,
+    longitude=21.01,
+    centre_distance_km=2.0,
+    poi_count=8,
+    ownership=OwnershipType.CONDOMINIUM,
+    has_parking=True,
+    has_balcony=False,
+    has_security=False,
+    has_storage=True,
 )
 
 
@@ -46,6 +53,9 @@ class _Registry:
     def register(self, run_id: str, name: str, metrics: dict[str, float]) -> ModelVersion:
         raise NotImplementedError
 
+    def log_and_register(self, model: Any, name: str, metrics: dict[str, float]) -> ModelVersion:
+        raise NotImplementedError
+
     def transition_stage(self, name: str, version: str, stage: ModelStage) -> ModelVersion:
         raise NotImplementedError
 
@@ -64,10 +74,10 @@ class _Registry:
         return self._model
 
 
-def test_predict_returns_result_without_interval() -> None:
+def test_predict_rounds_to_int_without_interval() -> None:
     pred = ModelBackedPredictor(_Registry(_Model(612_345.6789)), "price-predictor")
     out = pred.predict(_REQUEST)
-    assert str(out.predicted_price) == "612345.68"
+    assert out.predicted_price == 612_346
     assert out.model_version == "5"
     assert out.interval_low is None
 
@@ -77,8 +87,8 @@ def test_predict_uses_conformal_band_when_present() -> None:
         _Registry(_Model(500_000.0, conformal_q=25_000.0)), "price-predictor"
     )
     out = pred.predict(_REQUEST)
-    assert str(out.interval_low) == "475000.00"
-    assert str(out.interval_high) == "525000.00"
+    assert out.interval_low == 475_000
+    assert out.interval_high == 525_000
 
 
 def test_model_caches_after_first_load() -> None:
