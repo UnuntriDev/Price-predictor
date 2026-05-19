@@ -1,7 +1,14 @@
 # 13. Otodom __NEXT_DATA__ parsed against a documented assumed contract
 
-- Status: accepted (provisional)
+- Status: SUPERSEDED by [ADR 0014](0014-kaggle-dataset-primary-source.md)
 - Date: 2026-05-19
+
+> **Superseded note:** Otodom scraping is blocked by DataDome anti-bot,
+> which returns a shell page instead of the `__NEXT_DATA__` payload.
+> Direct scraping is out of scope for this portfolio project. The
+> scraping module is retained as an illustrative skeleton of the
+> architectural pattern; it is not active in the data pipeline. The
+> primary data source is now the Kaggle dataset (see ADR 0014).
 
 ## Context
 
