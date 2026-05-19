@@ -1,6 +1,6 @@
 # 9. DVC remote: S3-compatible (MinIO local, AWS S3 prod)
 
-- Status: accepted
+- Status: accepted (wired)
 - Date: 2026-05-19
 
 ## Context
@@ -25,5 +25,12 @@ contributors without S3/MinIO; it is not the primary path.
 
 - One DVC code path; MinIO and AWS differ only by endpoint/credentials.
 - CI can pull data deterministically from MinIO.
-- Open sub-decision: exact prod bucket/region and whether the GDrive
-  fallback is actually wired or just documented.
+
+## Status note (wired)
+
+`dvc init` done; `.dvc/config` committed (`s3://price-predictor/dvc`,
+endpoint `http://localhost:9000`); bucket creds live in the gitignored
+`.dvc/config.local`. `minio` + `minio-setup` services added to
+`docker-compose.yml`; `make data-push` / `make data-pull` use the
+remote. **Resolved:** GDrive fallback is *documented only*, not wired.
+**Still open:** the exact production S3 bucket/region.

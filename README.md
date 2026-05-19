@@ -137,11 +137,14 @@ make drift             # KS+PSI gate + Evidently HTML report
 - **Monitoring** — KS+PSI drift gate (deterministic) plus the Evidently
   HTML report job (ADR 0012).
 
+- **Data versioning** — DVC on an S3-compatible MinIO remote (ADR
+  0009); `make data-push` / `make data-pull`, `minio` in compose.
+
 **Provisional:** the Otodom `__NEXT_DATA__` key paths are an assumed
 contract (ADR 0013), exercised against a swappable synthetic fixture
-until a real capture is supplied. **Not wired:** DVC remote (ADR 0009)
-and the HF-Space-pulls-from-remote-registry deploy (ADR 0011) remain
-infra follow-ups.
+until a real capture is supplied. **Not wired:** the
+HF-Space-pulls-from-remote-registry deploy (ADR 0011) remains an infra
+follow-up.
 
 ## License
 

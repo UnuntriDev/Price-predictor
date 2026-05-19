@@ -46,6 +46,11 @@ jobs:
       - name: Sync (frozen) environment
         run: uv sync --frozen
 
+      - name: DVC config sanity
+        run: |
+          uv run dvc remote list
+          test "$(uv run dvc config core.remote)" = "minio"
+
       - name: Ruff lint
         run: uv run ruff check --output-format=github .
 

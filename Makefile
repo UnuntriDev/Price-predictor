@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 
 .PHONY: help install browsers lint format type test check pre-commit \
-        up down serve ui train scrape drift clean
+        up down serve ui train scrape drift data-push data-pull clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -54,6 +54,12 @@ scrape: browsers ## Run the Otodom crawl (needs Chromium via `make browsers`)
 
 drift: ## Drift gate + Evidently HTML report from Postgres listings
 	uv run python -m price_predictor.monitoring.job
+
+data-push: ## Push DVC-tracked data/models to the MinIO remote
+	uv run dvc push
+
+data-pull: ## Pull DVC-tracked data/models from the MinIO remote
+	uv run dvc pull
 
 clean: ## Remove caches and build artifacts
 	rm -rf .ruff_cache .mypy_cache .pytest_cache htmlcov .coverage \
