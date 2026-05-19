@@ -24,6 +24,12 @@ def test_valid_frame_passes_through() -> None:
     assert set(out.columns) == set(_valid_frame().columns)
 
 
+def test_current_kaggle_property_type_passes() -> None:
+    frame = _valid_frame().with_columns(property_type=pl.lit("apartmentBuilding"))
+    out = PanderaListingValidator().validate(frame)
+    assert out["property_type"].unique().to_list() == ["apartmentBuilding"]
+
+
 @pytest.mark.parametrize(
     "mutate",
     [

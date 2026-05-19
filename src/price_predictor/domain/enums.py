@@ -33,6 +33,7 @@ class CityEnum(StrEnum):
 class PropertyType(StrEnum):
     """Dataset ``type`` column (often missing -> Optional in the model)."""
 
+    APARTMENT_BUILDING = "apartmentBuilding"
     APARTMENT_BLOCK = "apartmentBlock"
     BLOCK_OF_FLATS = "blockOfFlats"
     TENEMENT = "tenement"

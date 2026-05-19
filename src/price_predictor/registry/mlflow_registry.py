@@ -73,11 +73,13 @@ class MLflowModelRegistry:
         """See :meth:`ModelRegistry.log_and_register`."""
         self._configure_global_uris()
         mlflow.set_experiment(self._settings.experiment_name)
-        with mlflow.start_run() as run:
+        with mlflow.start_run():
             mlflow.log_metrics(metrics)
-            mlflow.sklearn.log_model(model, name="model")
-            run_id = run.info.run_id
-        return self.register(run_id, name, metrics)
+            model_info = mlflow.sklearn.log_model(model, name="model")
+        version = mlflow.register_model(model_uri=model_info.model_uri, name=name)
+        for key, value in metrics.items():
+            self._client.set_model_version_tag(name, version.version, f"metric.{key}", value)
+        return self._to_domain(version, metrics)
 
     def transition_stage(self, name: str, version: str, stage: ModelStage) -> ModelVersion:
         """See :meth:`ModelRegistry.transition_stage`."""

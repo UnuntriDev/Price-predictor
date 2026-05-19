@@ -86,5 +86,8 @@ class PriceFeaturePipeline:
         return frame.with_columns(
             *[pl.col(col).cast(pl.Float64).fill_null(self._medians[col]) for col in _NUMERIC],
             *[pl.col(col).cast(pl.Utf8).fill_null(_MISSING) for col in _CATEGORICAL],
-            *[pl.col(col).fill_null(value=False).cast(pl.Int8) for col in _BOOL],
+            *[
+                pl.col(col).cast(pl.Boolean, strict=False).fill_null(value=False).cast(pl.Int8)
+                for col in _BOOL
+            ],
         ).select(*FEATURE_COLUMNS)

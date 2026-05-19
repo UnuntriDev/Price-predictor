@@ -47,7 +47,7 @@ def test_imputes_unseen_nulls_with_learned_median() -> None:
     one = frame.head(1).with_columns(
         floor=pl.lit(None, dtype=pl.Int64),
         condition=pl.lit(None, dtype=pl.Utf8),
-        has_elevator=pl.lit(None, dtype=pl.Boolean),
+        has_elevator=pl.lit(None, dtype=pl.Utf8),
     )
     out = pipe.transform(one)
     assert out["floor"].null_count() == 0
