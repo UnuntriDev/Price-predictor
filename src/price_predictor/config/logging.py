@@ -26,6 +26,13 @@ def configure_logging(settings: LoggingSettings) -> None:
     Args:
         settings: Logging level and output-format selection.
     """
+    # Force UTF-8 on stdio so third-party libs that print emoji (e.g.
+    # MLflow 3's run-link "View run ... at ..." line) don't crash on
+    # Windows non-UTF8 system locales such as cp1250.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+
     shared: list[Processor] = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
