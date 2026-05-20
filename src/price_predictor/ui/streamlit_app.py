@@ -18,8 +18,6 @@ from typing import Any
 
 import streamlit as st
 
-from price_predictor import __version__
-
 API_URL = os.environ.get("PP_INTERNAL_API_URL", "http://127.0.0.1:8000")
 _TIMEOUT = 30
 
@@ -65,8 +63,8 @@ def main() -> None:
     st.set_page_config(page_title="PricePredictor", layout="centered")
     st.title("PricePredictor")
     st.caption(
-        f"v{__version__} · Polish apartment price estimates with conformal "
-        "intervals · model pulled from MLflow registry at startup"
+        "Polish apartment price estimates with conformal intervals · "
+        "model pulled from MLflow registry at startup"
     )
 
     with st.form("predict"):
