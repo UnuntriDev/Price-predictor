@@ -43,9 +43,7 @@ def test_log_and_register_round_trip(tmp_path: Path) -> None:
         "price-predictor", artifact_location=(tmp_path / "artifacts").as_uri()
     )
 
-    model = LinearRegression().fit(
-        np.array([[0.0], [1.0], [2.0]]), np.array([0.0, 1.0, 2.0])
-    )
+    model = LinearRegression().fit(np.array([[0.0], [1.0], [2.0]]), np.array([0.0, 1.0, 2.0]))
 
     registry = MLflowModelRegistry(MLflowSettings(tracking_uri=tracking_uri))
 
