@@ -129,6 +129,28 @@ distances. Categorical: `city`, `property_type`, `ownership`,
 `domain.constants`, shared by the Pydantic `Listing` and the Pandera
 `RawListingSchema` so they cannot drift (ADR 0014).
 
+## Results (model card)
+
+Trained end to end with the committed code on the pinned Kaggle
+snapshot — every number below was produced by `make train` against
+`data/raw.dvc` (md5 `d4b0c88d…`, 195,568 rows · 11 monthly snapshots
+2023-08 → 2024-06 · 15 cities), and the artefact is registered as
+`price-predictor` v1 in the MLflow store.
+
+| Metric | Test set |
+|---|---:|
+| MAE | **82,005 PLN** |
+| RMSE | 121,818 PLN |
+| MAPE | 10.68% |
+| R² | **0.913** |
+| Conformal half-width (α = 0.1) | ±179,588 PLN |
+| Test rows | 39,114 (20% hold-out, seed 42) |
+
+Model: xgboost (`n_estimators=600`, `max_depth=6`, `lr=0.05`) over a
+`ColumnTransformer` (OHE on five categoricals, median imputation on
+numerics). Conformal interval is split-conformal on a separate 20%
+calibration fold (ADR 0008). Reproduce with `make data && make train`.
+
 ## Phase 2 — implemented
 
 Design decisions are recorded in [ADRs 0006–0014](docs/decisions/).
