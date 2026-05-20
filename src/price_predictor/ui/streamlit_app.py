@@ -6,6 +6,9 @@ both processes, see ADR 0004), and displays the price + conformal
 interval. All UI code lives in :func:`main` so importing the module has
 no side effects (keeps it unit-testable); ``streamlit run`` executes
 this file as ``__main__`` and the guard at the bottom invokes ``main``.
+
+Labels are in Polish (the model is Polish-market-only); API values
+stay lowercase ASCII to satisfy the CityEnum / OwnershipType contracts.
 """
 
 from __future__ import annotations
@@ -21,8 +24,8 @@ import streamlit as st
 API_URL = os.environ.get("PP_INTERNAL_API_URL", "http://127.0.0.1:8000")
 _TIMEOUT = 30
 
-# Approximate city centre coordinates so the user can pick a city and
-# get a sensible lat/lon default without consulting a map.
+# Display name (Polish, proper case) -> approximate city-centre coords.
+# The dict key is the canonical API value (lowercase ASCII, CityEnum).
 _CITY_CENTRES: dict[str, tuple[float, float]] = {
     "warszawa": (52.2297, 21.0122),
     "krakow": (50.0647, 19.9450),
@@ -39,6 +42,34 @@ _CITY_CENTRES: dict[str, tuple[float, float]] = {
     "czestochowa": (50.8118, 19.1203),
     "radom": (51.4027, 21.1471),
     "rzeszow": (50.0413, 21.9990),
+}
+_CITY_PL: dict[str, str] = {
+    "warszawa": "Warszawa",
+    "krakow": "Kraków",
+    "wroclaw": "Wrocław",
+    "poznan": "Poznań",
+    "gdansk": "Gdańsk",
+    "gdynia": "Gdynia",
+    "szczecin": "Szczecin",
+    "bydgoszcz": "Bydgoszcz",
+    "lublin": "Lublin",
+    "katowice": "Katowice",
+    "bialystok": "Białystok",
+    "lodz": "Łódź",
+    "czestochowa": "Częstochowa",
+    "radom": "Radom",
+    "rzeszow": "Rzeszów",
+}
+_PROPERTY_TYPE_PL: dict[str, str] = {
+    "": "— (nie podano)",
+    "apartmentBuilding": "Apartamentowiec",
+    "blockOfFlats": "Blok",
+    "tenement": "Kamienica",
+}
+_OWNERSHIP_PL: dict[str, str] = {
+    "condominium": "Własność",
+    "cooperative": "Spółdzielcze własnościowe",
+    "udział": "Udział",
 }
 
 
@@ -63,52 +94,63 @@ def main() -> None:
     st.set_page_config(page_title="PricePredictor", layout="centered")
     st.title("PricePredictor")
     st.caption(
-        "Polish apartment price estimates with conformal intervals · "
-        "model pulled from MLflow registry at startup"
+        "Wycena polskich mieszkań z przedziałami conformal · "
+        "model pobierany z rejestru MLflow przy starcie kontenera"
     )
 
     with st.form("predict"):
         col1, col2 = st.columns(2)
         with col1:
-            city = st.selectbox("City", sorted(_CITY_CENTRES), index=14)
+            city = st.selectbox(
+                "Miasto",
+                list(_CITY_PL),
+                index=0,
+                format_func=lambda v: _CITY_PL[v],
+            )
             lat_default, lon_default = _CITY_CENTRES[city]
-            square_meters = st.number_input("Area (m²)", 25.0, 150.0, 55.0, step=1.0)
-            rooms = st.number_input("Rooms", 1, 10, 3, step=1)
-            floor = st.number_input("Floor", 0, 30, 2, step=1)
-            floor_count = st.number_input("Total floors", 1, 30, 5, step=1)
-            build_year = st.number_input("Build year", 1850, 2024, 2010, step=1)
+            square_meters = st.number_input("Powierzchnia (m²)", 25.0, 150.0, 55.0, step=1.0)
+            rooms = st.number_input("Liczba pokoi", 1, 10, 3, step=1)
+            floor = st.number_input("Piętro", 0, 30, 2, step=1)
+            floor_count = st.number_input("Liczba pięter w budynku", 1, 30, 5, step=1)
+            build_year = st.number_input("Rok budowy", 1850, 2024, 2010, step=1)
         with col2:
-            latitude = st.number_input("Latitude", 49.0, 55.0, lat_default, step=0.01)
-            longitude = st.number_input("Longitude", 14.0, 24.0, lon_default, step=0.01)
+            latitude = st.number_input("Szerokość geograficzna", 49.0, 55.0, lat_default, step=0.01)
+            longitude = st.number_input("Długość geograficzna", 14.0, 24.0, lon_default, step=0.01)
             centre_distance_km = st.number_input(
-                "Distance to centre (km)", 0.0, 30.0, 3.0, step=0.1
+                "Odległość od centrum (km)", 0.0, 30.0, 3.0, step=0.1
             )
-            poi_count = st.number_input("POI count nearby", 0, 200, 20, step=1)
+            poi_count = st.number_input("Liczba punktów POI w pobliżu", 0, 200, 20, step=1)
             property_type = st.selectbox(
-                "Type", ["", "apartmentBuilding", "blockOfFlats", "tenement"]
+                "Typ budynku",
+                list(_PROPERTY_TYPE_PL),
+                format_func=lambda v: _PROPERTY_TYPE_PL[v],
             )
-            ownership = st.selectbox("Ownership", ["condominium", "cooperative", "udział"])
+            ownership = st.selectbox(
+                "Forma własności",
+                list(_OWNERSHIP_PL),
+                format_func=lambda v: _OWNERSHIP_PL[v],
+            )
 
-        st.markdown("**Amenities**")
+        st.markdown("**Udogodnienia**")
         a1, a2, a3, a4, a5 = st.columns(5)
         with a1:
             has_parking = st.checkbox("Parking", value=False)
         with a2:
-            has_balcony = st.checkbox("Balcony", value=True)
+            has_balcony = st.checkbox("Balkon", value=True)
         with a3:
-            has_elevator = st.checkbox("Elevator", value=False)
+            has_elevator = st.checkbox("Winda", value=False)
         with a4:
-            has_security = st.checkbox("Security", value=False)
+            has_security = st.checkbox("Ochrona", value=False)
         with a5:
-            has_storage = st.checkbox("Storage", value=False)
+            has_storage = st.checkbox("Komórka", value=False)
 
-        submitted = st.form_submit_button("Predict price", type="primary")
+        submitted = st.form_submit_button("Oszacuj cenę", type="primary")
 
     if not submitted:
         st.info(
-            "Fill the form and click **Predict price**. The trained model "
-            "is fetched from the registry at container startup; cold "
-            "requests are fast (≈ 50 ms)."
+            "Wypełnij formularz i kliknij **Oszacuj cenę**. Model jest "
+            "pobierany z rejestru MLflow przy starcie kontenera; każde "
+            "kolejne zapytanie odpowiada w ≈ 50 ms."
         )
         return
 
@@ -137,27 +179,27 @@ def main() -> None:
         result = _call_predict(payload)
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
-        st.error(f"API returned HTTP {exc.code}: {detail}")
+        st.error(f"API zwróciło HTTP {exc.code}: {detail}")
         return
     except urllib.error.URLError as exc:
-        st.error(f"Could not reach the API: {exc.reason}")
+        st.error(f"Nie udało się połączyć z API: {exc.reason}")
         return
 
     price = result["predicted_price"]
     lo = result.get("interval_low")
     hi = result.get("interval_high")
-    st.success(f"Estimated price: **{_fmt_pln(price)}**")
+    st.success(f"Szacowana cena: **{_fmt_pln(price)}**")
     if lo is not None and hi is not None:
         st.metric(
-            label="90% conformal interval",
+            label="Przedział ufności conformal (90%)",
             value=f"{_fmt_pln(lo)} — {_fmt_pln(hi)}",
             delta=f"± {_fmt_pln((hi - lo) / 2)}",
         )
     st.caption(
         f"Model: `{result['model_name']}` v{result['model_version']} · "
-        f"served at {result['predicted_at']}"
+        f"zwrócono o {result['predicted_at']}"
     )
-    with st.expander("Raw response"):
+    with st.expander("Surowa odpowiedź API"):
         st.json(result)
 
 
