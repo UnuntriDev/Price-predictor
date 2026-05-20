@@ -32,8 +32,8 @@ artifacts/
 *.joblib
 *.onnx
 
-# DVC
-/data/**/*.dvc
+# DVC: ignore the local cache/tmp; the small *.dvc pointer files MUST be
+# committed (that's how DVC pins data to a commit).
 .dvc/cache/
 .dvc/tmp/
 
