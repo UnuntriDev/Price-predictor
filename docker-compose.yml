@@ -95,7 +95,7 @@ services:
       context: .
       dockerfile: docker/ui.Dockerfile
     environment:
-      PP_API__HOST: api
+      PP_INTERNAL_API_URL: http://api:8000
     depends_on:
       api:
         condition: service_started
