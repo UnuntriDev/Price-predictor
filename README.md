@@ -1,11 +1,19 @@
 # PricePredictor
 
+[![Live demo on HF Spaces](https://img.shields.io/badge/demo-HF%20Space-yellow?logo=huggingface)](https://huggingface.co/spaces/Ununtri/price-predictor)
+[![MLflow tracking on DagsHub](https://img.shields.io/badge/MLflow-DagsHub-blue?logo=mlflow)](https://dagshub.com/UnuntriDev/Price-predictor.mlflow)
+[![CI](https://github.com/UnuntriDev/Price-predictor/actions/workflows/ci.yml/badge.svg)](https://github.com/UnuntriDev/Price-predictor/actions/workflows/ci.yml)
+
 **End-to-end MLOps pipeline that predicts Polish apartment prices from
 the public Kaggle dataset** — versioned data, validated contracts,
 training with conformal intervals and experiment tracking, a
 registry-backed inference API, a Streamlit demo, and drift monitoring.
 Built to portfolio quality: strict typing, Protocol-first interfaces,
 dependency injection, and a reproducible toolchain.
+
+The live demo Space pulls the production model from a public **DagsHub
+MLflow** registry at startup (ADR 0011 wired); the same artefact is
+trained from the **DVC-pinned** Kaggle snapshot (`data/raw.dvc`).
 
 > **Status: Phase 2 — implemented.** The loop runs end to end:
 > `make data → train (+ conformal) → MLflow register → serve /predict
