@@ -27,6 +27,7 @@ dependencies = [
     "duckdb>=1.1",
     "pandera[polars]>=0.20",
     "dvc[s3]>=3.55",
+    "kaggle>=1.6",
     "psycopg[binary]>=3.2",
     # --- ml ---
     "numpy>=2.0",
