@@ -52,13 +52,15 @@ class ModelBackedPredictor:
     def _ensure_loaded(self) -> Any:
         if self._model is None:
             try:
-                self._model = self._registry.load_model(self._model_name, self._stage)
-                self._version = self._registry.get_version(self._model_name, self._stage).version
+                model = self._registry.load_model(self._model_name, self._stage)
+                version = self._registry.get_version(self._model_name, self._stage).version
             except Exception as exc:
                 # Boundary: any registry/MLflow failure (incl. unreachable
                 # server) becomes the one domain error serving handles.
                 msg = f"could not load '{self._model_name}'@{self._stage.value}"
                 raise ModelNotLoadedError(msg) from exc
+            self._model = model
+            self._version = version
             _log.info("model.loaded", name=self._model_name, version=self._version)
         return self._model
 

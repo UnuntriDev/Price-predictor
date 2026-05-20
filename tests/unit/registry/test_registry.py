@@ -39,6 +39,19 @@ def test_to_domain_maps_mlflow_version() -> None:
     assert mv.metrics == {"mae": 1.0}
 
 
+def test_to_domain_extracts_metrics_from_model_version_tags() -> None:
+    fake = SimpleNamespace(
+        name="price-predictor",
+        version=7,
+        current_stage="Staging",
+        run_id="abc123",
+        creation_timestamp=1_700_000_000_000,
+        tags={"metric.mae": "123.45", "metric.r2": 0.67, "owner": "ml"},
+    )
+    mv = MLflowModelRegistry._to_domain(fake)
+    assert mv.metrics == {"mae": 123.45, "r2": 0.67}
+
+
 def test_load_model_configures_global_mlflow_uris(monkeypatch) -> None:
     calls = []
     model = object()

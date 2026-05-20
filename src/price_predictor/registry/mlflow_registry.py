@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
 import mlflow
 import mlflow.sklearn
-from mlflow.exceptions import MlflowException
 from mlflow.tracking import MlflowClient
 
 from price_predictor.config import get_logger
@@ -22,6 +22,7 @@ _STAGE_TO_MLFLOW: dict[ModelStage, str] = {
     ModelStage.PRODUCTION: "Production",
     ModelStage.ARCHIVED: "Archived",
 }
+_METRIC_TAG_PREFIX = "metric."
 
 
 class MLflowModelRegistry:
@@ -46,28 +47,30 @@ class MLflowModelRegistry:
         mlflow.set_registry_uri(registry_uri)
 
     @staticmethod
-    def _to_domain(version: Any, metrics: dict[str, float]) -> ModelVersion:
+    def _metrics_from_tags(tags: Mapping[str, Any] | None) -> dict[str, float]:
+        metrics: dict[str, float] = {}
+        for key, value in (tags or {}).items():
+            if not key.startswith(_METRIC_TAG_PREFIX):
+                continue
+            try:
+                metrics[key.removeprefix(_METRIC_TAG_PREFIX)] = float(value)
+            except (TypeError, ValueError):
+                _log.warning("registry.metric_tag_invalid", key=key, value=value)
+        return metrics
+
+    @classmethod
+    def _to_domain(cls, version: Any, metrics: dict[str, float] | None = None) -> ModelVersion:
+        version_metrics = cls._metrics_from_tags(getattr(version, "tags", None))
+        if metrics is not None:
+            version_metrics.update(metrics)
         return ModelVersion(
             name=version.name,
             version=str(version.version),
             stage=ModelStage(str(version.current_stage).lower()),
             run_id=version.run_id,
-            metrics=metrics,
+            metrics=version_metrics,
             created_at=datetime.fromtimestamp(version.creation_timestamp / 1000, tz=UTC),
         )
-
-    def register(self, run_id: str, name: str, metrics: dict[str, float]) -> ModelVersion:
-        """See :meth:`ModelRegistry.register`."""
-        try:
-            self._client.create_registered_model(name)
-        except MlflowException:
-            _log.info("registry.model_exists", name=name)
-        version = self._client.create_model_version(
-            name=name, source=f"runs:/{run_id}/model", run_id=run_id
-        )
-        for key, value in metrics.items():
-            self._client.set_model_version_tag(name, version.version, f"metric.{key}", value)
-        return self._to_domain(version, metrics)
 
     def log_and_register(self, model: Any, name: str, metrics: dict[str, float]) -> ModelVersion:
         """See :meth:`ModelRegistry.log_and_register`."""
@@ -86,7 +89,8 @@ class MLflowModelRegistry:
         updated = self._client.transition_model_version_stage(
             name=name, version=version, stage=_STAGE_TO_MLFLOW[stage]
         )
-        return self._to_domain(updated, {})
+        fresh = self._client.get_model_version(name, str(updated.version))
+        return self._to_domain(fresh)
 
     def get_version(self, name: str, stage: ModelStage) -> ModelVersion:
         """See :meth:`ModelRegistry.get_version`."""
@@ -94,7 +98,9 @@ class MLflowModelRegistry:
         if not matches:
             msg = f"no '{name}' version at stage {stage.value}"
             raise ModelNotFoundError(msg)
-        return self._to_domain(matches[0], {})
+        version = matches[0]
+        fresh = self._client.get_model_version(name, str(version.version))
+        return self._to_domain(fresh)
 
     def load_model(self, name: str, stage: ModelStage) -> Any:
         """See :meth:`ModelRegistry.load_model`.

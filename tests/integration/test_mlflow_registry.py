@@ -55,9 +55,11 @@ def test_log_and_register_round_trip(tmp_path: Path) -> None:
 
     promoted = registry.transition_stage("price-test", mv.version, ModelStage.STAGING)
     assert promoted.stage is ModelStage.STAGING
+    assert promoted.metrics["mae"] == 1.23
 
     got = registry.get_version("price-test", ModelStage.STAGING)
     assert got.version == mv.version
+    assert got.metrics["mae"] == 1.23
 
     with pytest.raises(ModelNotFoundError):
         registry.get_version("price-test", ModelStage.PRODUCTION)

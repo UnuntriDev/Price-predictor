@@ -8,9 +8,9 @@ snapshot month.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from price_predictor.domain import constants
 from price_predictor.domain.enums import (
@@ -21,6 +21,7 @@ from price_predictor.domain.enums import (
     PropertyType,
 )
 from price_predictor.domain.listing import NonEmptyStr
+from price_predictor.domain.validation import validate_build_year_not_future
 
 _OptDist = Annotated[float | None, Field(default=None, ge=0.0)]
 
@@ -61,6 +62,12 @@ class PredictionRequest(BaseModel):
     has_elevator: bool | None = None
     has_security: bool
     has_storage: bool
+
+    @model_validator(mode="after")
+    def _build_year_not_future(self) -> Self:
+        """Reject construction years after the current year."""
+        validate_build_year_not_future(self.build_year)
+        return self
 
 
 class PredictionResult(BaseModel):

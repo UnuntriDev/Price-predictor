@@ -11,10 +11,6 @@ from price_predictor.domain import ModelStage, ModelVersion
 class ModelRegistry(Protocol):
     """Registers, promotes, and loads trained model artifacts."""
 
-    def register(self, run_id: str, name: str, metrics: dict[str, float]) -> ModelVersion:
-        """Register the artifact from ``run_id`` and return its version."""
-        ...
-
     def log_and_register(self, model: Any, name: str, metrics: dict[str, float]) -> ModelVersion:
         """Log ``model`` in a fresh run and register it in one step."""
         ...

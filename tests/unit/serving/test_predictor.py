@@ -46,12 +46,15 @@ class _Model:
 
 
 class _Registry:
-    def __init__(self, model: Any | None, fail: bool = False) -> None:
+    def __init__(
+        self,
+        model: Any | None,
+        fail: bool = False,
+        fail_get_version: bool = False,
+    ) -> None:
         self._model = model
         self._fail = fail
-
-    def register(self, run_id: str, name: str, metrics: dict[str, float]) -> ModelVersion:
-        raise NotImplementedError
+        self._fail_get_version = fail_get_version
 
     def log_and_register(self, model: Any, name: str, metrics: dict[str, float]) -> ModelVersion:
         raise NotImplementedError
@@ -60,6 +63,8 @@ class _Registry:
         raise NotImplementedError
 
     def get_version(self, name: str, stage: ModelStage) -> ModelVersion:
+        if self._fail_get_version:
+            raise RegistryError("version boom")
         return ModelVersion(
             name=name,
             version="5",
@@ -103,6 +108,17 @@ def test_registry_failure_maps_to_model_not_loaded() -> None:
     pred = ModelBackedPredictor(_Registry(None, fail=True), "price-predictor")
     with pytest.raises(ModelNotLoadedError, match="could not load"):
         pred.predict(_REQUEST)
+
+
+def test_version_lookup_failure_does_not_cache_partial_model() -> None:
+    registry = _Registry(_Model(1.0), fail_get_version=True)
+    pred = ModelBackedPredictor(registry, "price-predictor")
+    with pytest.raises(ModelNotLoadedError, match="could not load"):
+        pred.predict(_REQUEST)
+
+    registry._fail_get_version = False
+    out = pred.predict(_REQUEST)
+    assert out.model_version == "5"
 
 
 def test_warmup_loads_model_when_registry_ok() -> None:

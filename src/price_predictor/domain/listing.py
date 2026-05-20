@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import date
 from typing import Annotated, Self
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
@@ -15,6 +15,7 @@ from price_predictor.domain.enums import (
     OwnershipType,
     PropertyType,
 )
+from price_predictor.domain.validation import validate_build_year_not_future
 
 NonEmptyStr = Annotated[str, StringConstraints(min_length=1, max_length=120, strip_whitespace=True)]
 
@@ -79,11 +80,7 @@ class Listing(BaseModel):
     @model_validator(mode="after")
     def _build_year_not_future(self) -> Self:
         """Reject construction years after the current year."""
-        if self.build_year is not None:
-            ceiling = datetime.now(UTC).year
-            if self.build_year > ceiling:
-                msg = f"build_year {self.build_year} exceeds current year {ceiling}"
-                raise ValueError(msg)
+        validate_build_year_not_future(self.build_year)
         return self
 
     @property

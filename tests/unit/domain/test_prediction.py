@@ -44,6 +44,11 @@ def test_request_rejects_price_field() -> None:
         PredictionRequest(**_req(), price_pln=1)
 
 
+def test_request_rejects_future_build_year() -> None:
+    with pytest.raises(ValidationError, match="build_year"):
+        PredictionRequest(**_req(), build_year=datetime.now(UTC).year + 1)
+
+
 def test_result_defaults_intervals_to_none() -> None:
     res = PredictionResult(
         predicted_price=612_345,
