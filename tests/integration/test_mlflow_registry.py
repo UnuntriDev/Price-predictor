@@ -1,6 +1,8 @@
 """MLflowModelRegistry round-trip against a temp SQLite store.
 
 No network/docker: SQLite backend + local file artifacts in tmp_path.
+Uses the same ``log_and_register`` entrypoint that scripts/train.py
+calls in production, so the test exercises the real MLflow 3 path.
 """
 
 from __future__ import annotations
@@ -9,7 +11,6 @@ import sys
 from pathlib import Path
 
 import mlflow
-import mlflow.sklearn
 import numpy as np
 import pytest
 from mlflow.tracking import MlflowClient
@@ -31,22 +32,24 @@ pytestmark = [
 ]
 
 
-def test_register_transition_get_and_load(tmp_path: Path) -> None:
+def test_log_and_register_round_trip(tmp_path: Path) -> None:
     tracking_uri = f"sqlite:///{tmp_path.as_posix()}/mlflow.db"
     mlflow.set_tracking_uri(tracking_uri)
-    client = MlflowClient(tracking_uri=tracking_uri)
-    exp_id = client.create_experiment(
-        "reg-test", artifact_location=(tmp_path / "artifacts").as_uri()
+    mlflow.set_registry_uri(tracking_uri)
+
+    # Pre-create the experiment with a local artifact location so the
+    # default "./mlruns" doesn't leak into the working tree.
+    MlflowClient(tracking_uri=tracking_uri).create_experiment(
+        "price-predictor", artifact_location=(tmp_path / "artifacts").as_uri()
     )
 
-    model = LinearRegression().fit(np.array([[0.0], [1.0], [2.0]]), np.array([0.0, 1.0, 2.0]))
-    with mlflow.start_run(experiment_id=exp_id) as run:
-        mlflow.sklearn.log_model(model, artifact_path="model")
-        run_id = run.info.run_id
+    model = LinearRegression().fit(
+        np.array([[0.0], [1.0], [2.0]]), np.array([0.0, 1.0, 2.0])
+    )
 
     registry = MLflowModelRegistry(MLflowSettings(tracking_uri=tracking_uri))
 
-    mv = registry.register(run_id, "price-test", {"mae": 1.23})
+    mv = registry.log_and_register(model, "price-test", {"mae": 1.23})
     assert mv.name == "price-test"
     assert mv.version == "1"
     assert mv.stage is ModelStage.NONE
