@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 from price_predictor.ui import main
-from price_predictor.ui.streamlit_app import _CITY_CENTRES, _resolve_location
+from price_predictor.ui.streamlit_app import (
+    _CITY_CENTRES,
+    _DISTRICT_CENTRE,
+    _DISTRICT_OTHER,
+    _resolve_from_choice,
+    _resolve_location,
+)
 
 
 def test_main_is_callable() -> None:
@@ -33,3 +39,43 @@ def test_resolve_location_falls_back_to_city_centre_for_unknown_text() -> None:
     assert location.label == "Gdańsk centrum"
     assert (location.latitude, location.longitude) == _CITY_CENTRES["gdansk"]
     assert location.centre_distance_km == 0.0
+
+
+def test_resolve_from_choice_centre_sentinel_uses_city_centre() -> None:
+    location = _resolve_from_choice("warszawa", _DISTRICT_CENTRE, "")
+
+    assert location.matched is True
+    assert (location.latitude, location.longitude) == _CITY_CENTRES["warszawa"]
+    assert location.centre_distance_km == 0.0
+    assert "centrum" in location.label.lower()
+
+
+def test_resolve_from_choice_named_district_picks_district_coords() -> None:
+    location = _resolve_from_choice("warszawa", "Ursynów", "")
+
+    assert location.matched is True
+    assert location.label == "Ursynów"
+    assert (location.latitude, location.longitude) != _CITY_CENTRES["warszawa"]
+    assert location.centre_distance_km > 0
+
+
+def test_resolve_from_choice_other_with_hint_falls_back_to_fuzzy_match() -> None:
+    location = _resolve_from_choice("krakow", _DISTRICT_OTHER, "Kazimierz, blisko Wisły")
+
+    assert location.matched is True
+    assert location.label == "Kazimierz"
+
+
+def test_resolve_from_choice_other_with_unknown_hint_flags_unmatched() -> None:
+    location = _resolve_from_choice("krakow", _DISTRICT_OTHER, "zupełnie nieznany adres")
+
+    assert location.matched is False
+    assert (location.latitude, location.longitude) == _CITY_CENTRES["krakow"]
+
+
+def test_resolve_from_choice_other_without_hint_uses_centre_silently() -> None:
+    location = _resolve_from_choice("gdansk", _DISTRICT_OTHER, "")
+
+    # No hint => no warning => matched stays True (= "user accepts centre").
+    assert location.matched is True
+    assert (location.latitude, location.longitude) == _CITY_CENTRES["gdansk"]

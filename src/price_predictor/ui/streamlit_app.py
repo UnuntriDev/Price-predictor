@@ -9,9 +9,12 @@ this file as ``__main__`` and the guard at the bottom invokes ``main``.
 
 Labels are in Polish (the model is Polish-market-only); API values
 stay lowercase ASCII to satisfy the CityEnum / OwnershipType contracts.
-The user supplies a city plus an address/district. The UI resolves a
-known district locally to approximate coordinates and falls back to the
-city centre when the text cannot be matched.
+The user picks a city plus a district from a per-city dropdown, or
+chooses "Inna lokalizacja" and types free text — the UI then tries a
+fuzzy district match before falling back to the city centre. The city
+selectbox lives outside the form so that switching cities re-renders
+the district list (widgets inside ``st.form`` don't trigger reruns
+until submit).
 """
 
 from __future__ import annotations
@@ -210,6 +213,11 @@ _DISTRICTS: dict[str, tuple[_KnownPlace, ...]] = {
 
 _POLISH_TRANSLATION = str.maketrans({"ł": "l", "Ł": "l"})
 
+# Sentinels for the district dropdown — distinct from real district
+# labels so we can safely test on identity / equality.
+_DISTRICT_CENTRE = "__centre__"
+_DISTRICT_OTHER = "__other__"
+
 
 def _normalise_location(text: str) -> str:
     asciiish = unicodedata.normalize("NFKD", text.casefold().translate(_POLISH_TRANSLATION))
@@ -226,10 +234,26 @@ def _haversine_km(start: tuple[float, float], end: tuple[float, float]) -> float
     return 6_371.0 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-def _resolve_location(city: str, address_or_district: str) -> LocationResolution:
+def _city_centre_location(city: str) -> LocationResolution:
     centre = _CITY_CENTRES[city]
+    return LocationResolution(
+        latitude=centre[0],
+        longitude=centre[1],
+        centre_distance_km=0.0,
+        label=f"{_CITY_PL[city]} centrum",
+        matched=True,
+    )
+
+
+def _resolve_location(city: str, address_or_district: str) -> LocationResolution:
+    """Best-effort match of a free-text address against known districts.
+
+    Used for the "Inna lokalizacja" path. Falls back to the city centre
+    with ``matched=False`` when nothing matches non-empty text.
+    """
     query = _normalise_location(address_or_district)
     if query:
+        centre = _CITY_CENTRES[city]
         for place in _DISTRICTS.get(city, ()):
             if re.search(rf"\b{re.escape(_normalise_location(place.label))}\b", query):
                 point = (place.latitude, place.longitude)
@@ -241,13 +265,51 @@ def _resolve_location(city: str, address_or_district: str) -> LocationResolution
                     matched=True,
                 )
 
-    return LocationResolution(
-        latitude=centre[0],
-        longitude=centre[1],
-        centre_distance_km=0.0,
-        label=f"{_CITY_PL[city]} centrum",
-        matched=not query,
-    )
+    fallback = _city_centre_location(city)
+    if query:
+        # Non-empty text but no match — flag so the UI can warn.
+        return LocationResolution(
+            latitude=fallback.latitude,
+            longitude=fallback.longitude,
+            centre_distance_km=0.0,
+            label=fallback.label,
+            matched=False,
+        )
+    return fallback
+
+
+def _resolve_from_choice(
+    city: str,
+    district_choice: str,
+    address_hint: str,
+) -> LocationResolution:
+    """Resolve a (city, dropdown choice, optional free-text hint).
+
+    Sentinels ``_DISTRICT_CENTRE`` / ``_DISTRICT_OTHER`` route to city
+    centre / free-text matching respectively; anything else is treated
+    as an exact district label.
+    """
+    if district_choice == _DISTRICT_CENTRE:
+        return _city_centre_location(city)
+
+    if district_choice == _DISTRICT_OTHER:
+        return _resolve_location(city, address_hint)
+
+    centre = _CITY_CENTRES[city]
+    for place in _DISTRICTS.get(city, ()):
+        if place.label == district_choice:
+            point = (place.latitude, place.longitude)
+            return LocationResolution(
+                latitude=place.latitude,
+                longitude=place.longitude,
+                centre_distance_km=round(_haversine_km(centre, point), 2),
+                label=place.label,
+                matched=True,
+            )
+
+    # Defensive: unknown label (should not happen if the UI builds the
+    # list from ``_DISTRICTS``) — degrade gracefully to centre.
+    return _city_centre_location(city)
 
 
 def _call_predict(payload: dict[str, Any]) -> dict[str, Any]:
@@ -275,18 +337,38 @@ def main() -> None:
         "model pobierany z rejestru MLflow przy starcie kontenera"
     )
 
+    # City lives outside the form so changing it re-renders the
+    # district dropdown below with the right per-city list.
+    city = st.selectbox(
+        "Miasto",
+        list(_CITY_PL),
+        index=0,
+        format_func=lambda v: _CITY_PL[v],
+    )
+
+    districts = _DISTRICTS.get(city, ())
+    district_options: list[str] = [_DISTRICT_CENTRE, *(p.label for p in districts), _DISTRICT_OTHER]
+    district_labels: dict[str, str] = {
+        _DISTRICT_CENTRE: f"Centrum ({_CITY_PL[city]})",
+        _DISTRICT_OTHER: "Inna lokalizacja w mieście…",
+    }
+
     with st.form("predict"):
         col1, col2 = st.columns(2)
         with col1:
-            city = st.selectbox(
-                "Miasto",
-                list(_CITY_PL),
-                index=0,
-                format_func=lambda v: _CITY_PL[v],
+            district_choice = st.selectbox(
+                "Dzielnica",
+                district_options,
+                format_func=lambda v: district_labels.get(v, v),
+                help=(
+                    "Wybierz dzielnicę z listy. Wartość wpływa na "
+                    "współrzędne i odległość od centrum, których model "
+                    "używa jako cech."
+                ),
             )
-            address_or_district = st.text_input(
-                "Adres lub dzielnica",
-                placeholder="np. Mokotów, Stare Miasto, ul. Długa",
+            address_hint = st.text_input(
+                "Adres pomocniczy (opcjonalny)",
+                placeholder="np. ul. Długa 15 — używane, gdy wybrano 'Inna lokalizacja'",
             )
             square_meters = st.number_input("Powierzchnia (m²)", 25.0, 150.0, 55.0, step=1.0)
             rooms = st.number_input("Liczba pokoi", 1, 10, 3, step=1)
@@ -329,7 +411,7 @@ def main() -> None:
         )
         return
 
-    location = _resolve_location(city, address_or_district)
+    location = _resolve_from_choice(city, district_choice, address_hint)
     payload: dict[str, Any] = {
         "city": city,
         "square_meters": float(square_meters),
@@ -364,10 +446,11 @@ def main() -> None:
     price = result["predicted_price"]
     lo = result.get("interval_low")
     hi = result.get("interval_high")
-    if address_or_district and not location.matched:
+    if district_choice == _DISTRICT_OTHER and address_hint and not location.matched:
         st.warning(
-            "Nie rozpoznano dzielnicy lub adresu lokalnie, więc użyto centrum miasta. "
-            "Model nie wysyła adresu do zewnętrznego geokodera."
+            "Nie rozpoznano podanego adresu lokalnie, więc użyto centrum miasta. "
+            "Model nie wysyła adresu do zewnętrznego geokodera — wybierz "
+            "dzielnicę z listy, jeśli chcesz wpłynąć na współrzędne."
         )
     st.success(f"Szacowana cena: **{_fmt_pln(price)}**")
     if lo is not None and hi is not None:
