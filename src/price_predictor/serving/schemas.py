@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
+from price_predictor.domain import ModelStage
+
 
 class ModelInfo(BaseModel):
     """Metadata about the model currently backing ``/predict``.
@@ -19,7 +21,7 @@ class ModelInfo(BaseModel):
 
     name: str
     version: str
-    stage: str
+    stage: ModelStage
     loaded: bool
 
 

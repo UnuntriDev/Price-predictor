@@ -26,7 +26,7 @@ import re
 import unicodedata
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 import streamlit as st
@@ -245,6 +245,19 @@ def _city_centre_location(city: str) -> LocationResolution:
     )
 
 
+def _place_location(city: str, place: _KnownPlace) -> LocationResolution:
+    """Build a matched ``LocationResolution`` for a known district."""
+    centre = _CITY_CENTRES[city]
+    point = (place.latitude, place.longitude)
+    return LocationResolution(
+        latitude=place.latitude,
+        longitude=place.longitude,
+        centre_distance_km=round(_haversine_km(centre, point), 2),
+        label=place.label,
+        matched=True,
+    )
+
+
 def _resolve_location(city: str, address_or_district: str) -> LocationResolution:
     """Best-effort match of a free-text address against known districts.
 
@@ -253,29 +266,12 @@ def _resolve_location(city: str, address_or_district: str) -> LocationResolution
     """
     query = _normalise_location(address_or_district)
     if query:
-        centre = _CITY_CENTRES[city]
         for place in _DISTRICTS.get(city, ()):
             if re.search(rf"\b{re.escape(_normalise_location(place.label))}\b", query):
-                point = (place.latitude, place.longitude)
-                return LocationResolution(
-                    latitude=place.latitude,
-                    longitude=place.longitude,
-                    centre_distance_km=round(_haversine_km(centre, point), 2),
-                    label=place.label,
-                    matched=True,
-                )
-
-    fallback = _city_centre_location(city)
-    if query:
+                return _place_location(city, place)
         # Non-empty text but no match — flag so the UI can warn.
-        return LocationResolution(
-            latitude=fallback.latitude,
-            longitude=fallback.longitude,
-            centre_distance_km=0.0,
-            label=fallback.label,
-            matched=False,
-        )
-    return fallback
+        return replace(_city_centre_location(city), matched=False)
+    return _city_centre_location(city)
 
 
 def _resolve_from_choice(
@@ -295,21 +291,15 @@ def _resolve_from_choice(
     if district_choice == _DISTRICT_OTHER:
         return _resolve_location(city, address_hint)
 
-    centre = _CITY_CENTRES[city]
     for place in _DISTRICTS.get(city, ()):
         if place.label == district_choice:
-            point = (place.latitude, place.longitude)
-            return LocationResolution(
-                latitude=place.latitude,
-                longitude=place.longitude,
-                centre_distance_km=round(_haversine_km(centre, point), 2),
-                label=place.label,
-                matched=True,
-            )
+            return _place_location(city, place)
 
-    # Defensive: unknown label (should not happen if the UI builds the
-    # list from ``_DISTRICTS``) — degrade gracefully to centre.
-    return _city_centre_location(city)
+    # Reached only if the caller passed a district label that isn't in
+    # ``_DISTRICTS`` for this city — a programmer error, not a user one,
+    # because the UI builds the dropdown from the same dict.
+    msg = f"unknown district {district_choice!r} for city {city!r}"
+    raise ValueError(msg)
 
 
 def _call_predict(payload: dict[str, Any]) -> dict[str, Any]:
@@ -324,8 +314,14 @@ def _call_predict(payload: dict[str, Any]) -> dict[str, Any]:
         return body
 
 
+@st.cache_data(ttl=30, show_spinner=False)
 def _fetch_health() -> dict[str, Any] | None:
-    """Read ``/health`` for the footer. Best-effort — never raises."""
+    """Read ``/health`` for the footer. Best-effort — never raises.
+
+    Cached for 30 s so that the badge does not trigger a localhost
+    roundtrip on every Streamlit rerun (every keystroke / widget change
+    re-runs the script top-to-bottom).
+    """
     try:
         with urllib.request.urlopen(f"{API_URL}/health", timeout=_TIMEOUT) as resp:
             body: dict[str, Any] = json.loads(resp.read().decode("utf-8"))

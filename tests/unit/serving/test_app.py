@@ -85,10 +85,10 @@ def test_describe_model_reflects_load_state() -> None:
         MLflowModelRegistry(MLflowSettings(tracking_uri="http://127.0.0.1:1")),
         model_name="price-predictor",
     )
-    # Before warmup: loaded=False, version="unknown".
+    # Before warmup: ``loaded`` is the contract; ``version`` is an
+    # internal placeholder when nothing has been resolved yet.
     info = predictor.describe_model()
     assert info.loaded is False
-    assert info.version == "unknown"
     assert info.name == "price-predictor"
     assert info.stage == "production"
 

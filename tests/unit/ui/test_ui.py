@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from price_predictor.ui import main
 from price_predictor.ui.streamlit_app import (
     _CITY_CENTRES,
@@ -72,6 +74,14 @@ def test_resolve_from_choice_other_with_unknown_hint_flags_unmatched() -> None:
 
     assert location.matched is False
     assert (location.latitude, location.longitude) == _CITY_CENTRES["krakow"]
+
+
+def test_resolve_from_choice_unknown_district_raises() -> None:
+    # Programmer error — the UI builds the dropdown from _DISTRICTS, so a
+    # label not present in the city's list should surface loudly, not
+    # silently degrade to the city centre.
+    with pytest.raises(ValueError, match="unknown district"):
+        _resolve_from_choice("warszawa", "Atlantyda", "")
 
 
 def test_resolve_from_choice_other_without_hint_uses_centre_silently() -> None:

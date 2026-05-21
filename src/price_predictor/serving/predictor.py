@@ -8,6 +8,7 @@ carries a ``conformal_q`` attribute it becomes a prediction interval.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
@@ -26,6 +27,12 @@ from price_predictor.registry.ports import ModelRegistry
 from price_predictor.serving.schemas import ModelInfo
 
 _log = get_logger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class _Loaded:
+    model: Any
+    version: str
 
 
 class ModelBackedPredictor:
@@ -47,36 +54,36 @@ class ModelBackedPredictor:
         self._registry = registry
         self._model_name = model_name
         self._stage = stage
-        self._model: Any | None = None
-        self._version: str = "unknown"
+        # Single source of truth for load state: None until warmup/first
+        # request succeeds. Avoids drift between a `_model` field and a
+        # parallel `_version` cache.
+        self._loaded: _Loaded | None = None
 
     def _ensure_loaded(self) -> Any:
-        if self._model is None:
+        if self._loaded is None:
             try:
                 model = self._registry.load_model(self._model_name, self._stage)
                 version = self._registry.get_version(self._model_name, self._stage).version
             except Exception as exc:
                 # Boundary: any registry/MLflow failure (incl. unreachable
                 # server) becomes the one domain error serving handles.
-                msg = f"could not load '{self._model_name}'@{self._stage.value}"
+                msg = f"could not load '{self._model_name}'@{self._stage}"
                 raise ModelNotLoadedError(msg) from exc
-            self._model = model
-            self._version = version
-            _log.info("model.loaded", name=self._model_name, version=self._version)
-        return self._model
+            self._loaded = _Loaded(model=model, version=version)
+            _log.info("model.loaded", name=self._model_name, version=version)
+        return self._loaded.model
 
     def describe_model(self) -> ModelInfo:
         """Snapshot of what is loaded (no I/O, never raises).
 
         ``/health`` calls this to expose the live artefact's identity
-        without coupling to MLflow. ``loaded`` flips to ``True`` once
-        ``_ensure_loaded`` has succeeded at least once.
+        without coupling to MLflow.
         """
         return ModelInfo(
             name=self._model_name,
-            version=self._version,
-            stage=self._stage.value,
-            loaded=self._model is not None,
+            version=self._loaded.version if self._loaded is not None else "",
+            stage=self._stage,
+            loaded=self._loaded is not None,
         )
 
     def warmup(self) -> None:
@@ -94,6 +101,8 @@ class ModelBackedPredictor:
     def predict(self, request: PredictionRequest) -> PredictionResult:
         """See :meth:`PredictorService.predict`."""
         model = self._ensure_loaded()
+        # ``_ensure_loaded`` succeeded, so ``_loaded`` is set here.
+        assert self._loaded is not None
         row: dict[str, list[Any]] = {}
         for col in FEATURE_COLUMNS:
             value = getattr(request, col)
@@ -110,6 +119,6 @@ class ModelBackedPredictor:
             interval_low=max(low, 0) if low is not None else None,
             interval_high=high,
             model_name=self._model_name,
-            model_version=self._version,
+            model_version=self._loaded.version,
             predicted_at=datetime.now(UTC),
         )
