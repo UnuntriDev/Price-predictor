@@ -324,8 +324,31 @@ def _call_predict(payload: dict[str, Any]) -> dict[str, Any]:
         return body
 
 
+def _fetch_health() -> dict[str, Any] | None:
+    """Read ``/health`` for the footer. Best-effort — never raises."""
+    try:
+        with urllib.request.urlopen(f"{API_URL}/health", timeout=_TIMEOUT) as resp:
+            body: dict[str, Any] = json.loads(resp.read().decode("utf-8"))
+            return body
+    except (urllib.error.URLError, TimeoutError, ValueError):
+        return None
+
+
 def _fmt_pln(value: int | float) -> str:
     return f"{round(value):,} PLN".replace(",", " ")
+
+
+def _model_badge(health: dict[str, Any] | None) -> str | None:
+    if not health:
+        return None
+    info = health.get("model_info")
+    if not info:
+        return None
+    name = info.get("name", "?")
+    version = info.get("version", "?")
+    stage = info.get("stage", "?")
+    state = "załadowany" if info.get("loaded") else "nie załadowany"
+    return f"Model: `{name}` v{version} · stage `{stage}` · {state}"
 
 
 def main() -> None:
@@ -336,6 +359,10 @@ def main() -> None:
         "Wycena polskich mieszkań z przedziałami conformal · "
         "model pobierany z rejestru MLflow przy starcie kontenera"
     )
+
+    badge = _model_badge(_fetch_health())
+    if badge is not None:
+        st.caption(badge)
 
     # City lives outside the form so changing it re-renders the
     # district dropdown below with the right per-city list.

@@ -7,6 +7,7 @@ from price_predictor.ui.streamlit_app import (
     _CITY_CENTRES,
     _DISTRICT_CENTRE,
     _DISTRICT_OTHER,
+    _model_badge,
     _resolve_from_choice,
     _resolve_location,
 )
@@ -79,3 +80,44 @@ def test_resolve_from_choice_other_without_hint_uses_centre_silently() -> None:
     # No hint => no warning => matched stays True (= "user accepts centre").
     assert location.matched is True
     assert (location.latitude, location.longitude) == _CITY_CENTRES["gdansk"]
+
+
+def test_model_badge_none_when_health_missing() -> None:
+    assert _model_badge(None) is None
+    assert _model_badge({"status": "ok"}) is None
+    assert _model_badge({"status": "ok", "model_info": None}) is None
+
+
+def test_model_badge_renders_loaded_state() -> None:
+    badge = _model_badge(
+        {
+            "status": "ok",
+            "model_info": {
+                "name": "price-predictor",
+                "version": "1",
+                "stage": "production",
+                "loaded": True,
+            },
+        }
+    )
+    assert badge is not None
+    assert "price-predictor" in badge
+    assert "v1" in badge
+    assert "production" in badge
+    assert "załadowany" in badge
+
+
+def test_model_badge_renders_unloaded_state() -> None:
+    badge = _model_badge(
+        {
+            "status": "ok",
+            "model_info": {
+                "name": "price-predictor",
+                "version": "unknown",
+                "stage": "production",
+                "loaded": False,
+            },
+        }
+    )
+    assert badge is not None
+    assert "nie załadowany" in badge

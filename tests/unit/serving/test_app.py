@@ -15,6 +15,7 @@ from price_predictor.domain import (
 from price_predictor.registry import MLflowModelRegistry
 from price_predictor.serving import create_app, get_app
 from price_predictor.serving.predictor import ModelBackedPredictor
+from price_predictor.serving.schemas import ModelInfo
 
 _PAYLOAD = {
     "city": "warszawa",
@@ -48,10 +49,48 @@ class _UnavailablePredictor:
         raise ModelNotLoadedError("no production model")
 
 
+class _DescribingPredictor(_OkPredictor):
+    def describe_model(self) -> ModelInfo:
+        return ModelInfo(
+            name="price-predictor",
+            version="3",
+            stage="production",
+            loaded=True,
+        )
+
+
 def test_health_ok() -> None:
     resp = TestClient(create_app(_OkPredictor())).get("/health")
     assert resp.status_code == 200
-    assert resp.json()["status"] == "ok"
+    body = resp.json()
+    assert body["status"] == "ok"
+    # Plain PredictorService without describe_model -> no model_info.
+    assert body["model_info"] is None
+
+
+def test_health_exposes_model_info_when_predictor_supports_it() -> None:
+    resp = TestClient(create_app(_DescribingPredictor())).get("/health")
+    assert resp.status_code == 200
+    info = resp.json()["model_info"]
+    assert info == {
+        "name": "price-predictor",
+        "version": "3",
+        "stage": "production",
+        "loaded": True,
+    }
+
+
+def test_describe_model_reflects_load_state() -> None:
+    predictor = ModelBackedPredictor(
+        MLflowModelRegistry(MLflowSettings(tracking_uri="http://127.0.0.1:1")),
+        model_name="price-predictor",
+    )
+    # Before warmup: loaded=False, version="unknown".
+    info = predictor.describe_model()
+    assert info.loaded is False
+    assert info.version == "unknown"
+    assert info.name == "price-predictor"
+    assert info.stage == "production"
 
 
 def test_metrics_exposed() -> None:
