@@ -1,10 +1,4 @@
-"""Hydra composition helper.
-
-Hydra owns *experiment* configuration (which model, which search space,
-which data window). This module wraps Hydra's compose API so callers get
-a plain, typed-at-the-edge ``DictConfig`` without each entrypoint having
-to manage Hydra's global state.
-"""
+"""Thin wrapper over Hydra's compose API — owns its global state for callers."""
 
 from __future__ import annotations
 
@@ -20,14 +14,7 @@ _ENV_OVERRIDE = "PP_CONFIGS_DIR"
 
 
 def configs_dir() -> Path:
-    """Locate the top-level ``configs/`` directory.
-
-    Resolution order: the ``PP_CONFIGS_DIR`` env var (set in containers),
-    then the repo-root ``configs/`` inferred from this file's location.
-
-    Returns:
-        Absolute path to the Hydra config root.
-    """
+    """``configs/`` root: ``PP_CONFIGS_DIR`` env var, else repo-relative."""
     override = os.environ.get(_ENV_OVERRIDE)
     if override:
         return Path(override).resolve()
@@ -39,15 +26,7 @@ def compose_config(
     *,
     config_name: str = "config",
 ) -> DictConfig:
-    """Compose a Hydra configuration tree.
-
-    Args:
-        overrides: Hydra dotlist overrides, e.g. ``["model=lightgbm"]``.
-        config_name: Root config file name (without extension).
-
-    Returns:
-        The composed configuration.
-    """
+    """Compose with dotlist overrides like ``model=lightgbm``."""
     GlobalHydra.instance().clear()
     with initialize_config_dir(version_base=None, config_dir=str(configs_dir())):
         cfg = compose(config_name=config_name, overrides=list(overrides or []))

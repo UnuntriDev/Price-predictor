@@ -1,12 +1,7 @@
-"""Runtime configuration via pydantic-settings.
+"""Runtime config (ADR 0002).
 
-Responsibility split (see ADR 0002): **pydantic-settings owns the
-deployment environment and secrets** (DB credentials, ports, URIs);
-**Hydra owns experiment/pipeline composition** (model choice, search
-spaces, data paths). They never read each other's sources.
-
-All variables use the ``PP_`` prefix and ``__`` to descend into nested
-groups, e.g. ``PP_POSTGRES__PASSWORD``.
+pydantic-settings owns env + secrets; Hydra owns experiment composition.
+Env vars use ``PP_`` prefix and ``__`` for nesting (e.g. ``PP_POSTGRES__PASSWORD``).
 """
 
 from __future__ import annotations
@@ -25,7 +20,7 @@ _PROMETHEUS_DEFAULT_PORT = 9090
 
 
 class AppEnv(StrEnum):
-    """Deployment environment the process is running in."""
+    """Where the process runs."""
 
     LOCAL = "local"
     CI = "ci"
@@ -33,7 +28,7 @@ class AppEnv(StrEnum):
 
 
 class PostgresSettings(BaseModel):
-    """Connection parameters for the application Postgres instance."""
+    """libpq connection params."""
 
     host: str = "localhost"
     port: int = Field(default=_POSTGRES_DEFAULT_PORT, ge=1, le=65535)
@@ -43,17 +38,13 @@ class PostgresSettings(BaseModel):
 
     @property
     def dsn(self) -> str:
-        """Return a psycopg v3 connection string with the secret revealed."""
+        """Psycopg v3 conn string (secret revealed)."""
         pwd = self.password.get_secret_value()
         return f"postgresql://{self.user}:{pwd}@{self.host}:{self.port}/{self.database}"
 
 
 class MLflowSettings(BaseModel):
-    """MLflow tracking/registry configuration.
-
-    Defaults to a local SQLite store; docker-compose overrides the URI to
-    point at the Postgres service (see ADR 0003).
-    """
+    """Tracking/registry URIs (ADR 0003 — defaults to local SQLite)."""
 
     tracking_uri: str = "sqlite:///mlflow.db"
     registry_uri: str | None = None
@@ -61,7 +52,7 @@ class MLflowSettings(BaseModel):
 
 
 class ScrapingSettings(BaseModel):
-    """Polite-crawl parameters for the Otodom spider."""
+    """Polite-crawl knobs for the Otodom spider."""
 
     base_url: str = "https://www.otodom.pl"
     max_pages: int = Field(default=50, ge=1)
@@ -71,7 +62,7 @@ class ScrapingSettings(BaseModel):
 
 
 class APISettings(BaseModel):
-    """FastAPI inference service binding and model selection."""
+    """Inference service bind + model selection."""
 
     host: str = "0.0.0.0"
     port: int = Field(default=_API_DEFAULT_PORT, ge=1, le=65535)
@@ -82,21 +73,21 @@ class APISettings(BaseModel):
 
 
 class MonitoringSettings(BaseModel):
-    """Drift detection and metrics exposure."""
+    """Drift thresholds + Prometheus port."""
 
     prometheus_port: int = Field(default=_PROMETHEUS_DEFAULT_PORT, ge=1, le=65535)
     drift_p_value_threshold: float = Field(default=0.05, gt=0.0, lt=1.0)
 
 
 class LoggingSettings(BaseModel):
-    """Structured logging behaviour."""
+    """structlog options."""
 
     level: str = "INFO"
     json_output: bool = False
 
 
 class Settings(BaseSettings):
-    """Top-level application settings, composed from the environment."""
+    """Root settings, composed from env + .env."""
 
     model_config = SettingsConfigDict(
         env_prefix="PP_",
@@ -119,10 +110,5 @@ class Settings(BaseSettings):
 
 
 def get_settings() -> Settings:
-    """Build a fresh :class:`Settings` from the current environment.
-
-    Returns:
-        A populated settings instance. Not cached: tests and the eventual
-        DI container should own lifetime, not a module-level singleton.
-    """
+    """Build fresh from env. Not cached — callers own lifetime."""
     return Settings()

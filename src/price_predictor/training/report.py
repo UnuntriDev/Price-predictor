@@ -1,8 +1,4 @@
-"""Evaluation report contract.
-
-A frozen Pydantic model so a training run's scores serialise verbatim
-into MLflow and the ``registry_model_versions.metrics`` column.
-"""
+"""Frozen scores model. Serialises into MLflow + registry verbatim."""
 
 from __future__ import annotations
 
@@ -12,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class RegressionReport(BaseModel):
-    """Hold-out metrics for a price regressor."""
+    """Test-set metrics."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -23,7 +19,7 @@ class RegressionReport(BaseModel):
     n_samples: Annotated[int, Field(gt=0)]
 
     def as_metrics(self) -> dict[str, float]:
-        """Return a flat ``name -> value`` mapping for the registry/MLflow."""
+        """Flatten to ``name → value`` for MLflow."""
         return {
             "mae": self.mae,
             "rmse": self.rmse,

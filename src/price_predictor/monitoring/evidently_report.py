@@ -1,8 +1,7 @@
-"""Human-facing Evidently HTML drift report (ADR 0012).
+"""Evidently HTML drift report (ADR 0012).
 
-The programmatic gate is :class:`StatisticalDriftDetector`; this module
-is the *report* side — a rich HTML artifact for humans. It is isolated
-here so Evidently's evolving API touches exactly one file.
+Programmatic gate lives in :mod:`drift`. Evidently's API churn is
+quarantined to this one file.
 """
 
 from __future__ import annotations
@@ -17,7 +16,7 @@ from price_predictor.domain import MonitoringError
 
 
 class EvidentlyReportGenerator:
-    """Writes an Evidently ``DataDriftPreset`` report as standalone HTML."""
+    """Writes the ``DataDriftPreset`` as standalone HTML."""
 
     def generate(
         self,
@@ -25,19 +24,7 @@ class EvidentlyReportGenerator:
         current: pl.DataFrame,
         output_path: Path,
     ) -> Path:
-        """Render the drift report to ``output_path``.
-
-        Args:
-            reference: Baseline window.
-            current: Window under inspection.
-            output_path: Destination ``.html`` file.
-
-        Returns:
-            ``output_path``.
-
-        Raises:
-            MonitoringError: If the frames are empty or Evidently fails.
-        """
+        """Render to ``output_path``."""
         if reference.is_empty() or current.is_empty():
             msg = "drift report needs non-empty reference and current frames"
             raise MonitoringError(msg)
@@ -51,7 +38,7 @@ class EvidentlyReportGenerator:
             snapshot.save_html(str(output_path))
         except MonitoringError:
             raise
-        except Exception as exc:  # Evidently raises broadly
+        except Exception as exc:  # Evidently throws a wide net
             msg = f"Evidently report generation failed: {exc}"
             raise MonitoringError(msg) from exc
         return output_path

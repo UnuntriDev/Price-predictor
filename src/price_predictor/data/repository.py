@@ -1,8 +1,7 @@
-"""Postgres-backed :class:`ListingRepository` (psycopg v3).
+"""Postgres :class:`ListingRepository` (psycopg v3).
 
-Mirrors the Kaggle-schema :class:`Listing`. The natural key is
-``(id, snapshot_month)`` because the dataset is a monthly panel: the
-same listing id recurs across snapshots.
+Natural key is ``(id, snapshot_month)`` — the dataset is a monthly
+panel, the same listing id reappears across snapshots.
 """
 
 from __future__ import annotations
@@ -105,26 +104,14 @@ def _row(listing: Listing) -> dict[str, object]:
 
 
 class PostgresListingRepository:
-    """Persists listings in Postgres via psycopg v3.
-
-    Args:
-        settings: Connection parameters. Injected, never read from a
-            module-level global, so tests can point at a throwaway DB.
-    """
+    """psycopg v3 adapter for the listings table."""
 
     def __init__(self, settings: PostgresSettings) -> None:
         self._settings = settings
 
     @classmethod
     def from_dsn(cls, dsn: str) -> PostgresListingRepository:
-        """Build a repository from a libpq connection string.
-
-        Args:
-            dsn: e.g. ``postgresql://user:pass@host:5432/db``.
-
-        Returns:
-            A repository pointed at ``dsn``.
-        """
+        """Build from a libpq connection string."""
         info = conninfo_to_dict(dsn)
         return cls(
             PostgresSettings(
@@ -137,11 +124,7 @@ class PostgresListingRepository:
         )
 
     def create_schema(self) -> None:
-        """Create the ``listings`` table if it does not exist.
-
-        Raises:
-            StorageError: On any connection/DDL failure.
-        """
+        """Create the ``listings`` table if absent."""
         try:
             with psycopg.connect(self._settings.dsn) as conn:
                 conn.execute(_CREATE_SCHEMA)

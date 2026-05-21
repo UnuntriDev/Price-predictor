@@ -1,7 +1,6 @@
-"""Inference request/response contracts.
+"""Inference request/response contracts (ADR 0014).
 
-The request carries the modelled features (ADR 0014); it is decoupled
-from :class:`Listing` because the caller supplies no id, price, or
+Separate from :class:`Listing` — the caller never sends id, price or
 snapshot month.
 """
 
@@ -27,7 +26,7 @@ _OptDist = Annotated[float | None, Field(default=None, ge=0.0)]
 
 
 class PredictionRequest(BaseModel):
-    """Features a caller supplies to value an apartment."""
+    """What a caller sends to ``/predict``."""
 
     model_config = ConfigDict(frozen=True, extra="forbid", str_strip_whitespace=True)
 
@@ -65,22 +64,13 @@ class PredictionRequest(BaseModel):
 
     @model_validator(mode="after")
     def _build_year_not_future(self) -> Self:
-        """Reject construction years after the current year."""
+        """No build years past today."""
         validate_build_year_not_future(self.build_year)
         return self
 
 
 class PredictionResult(BaseModel):
-    """A model's valuation of a :class:`PredictionRequest`.
-
-    Attributes:
-        predicted_price: Point estimate in PLN.
-        interval_low: Lower bound of the prediction interval, if any.
-        interval_high: Upper bound of the prediction interval, if any.
-        model_name: Registered model name that produced the estimate.
-        model_version: Registered model version string.
-        predicted_at: UTC timestamp the inference was served.
-    """
+    """Point estimate + optional conformal interval."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 

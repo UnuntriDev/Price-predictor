@@ -1,10 +1,7 @@
-"""Otodom Scrapy spider (illustrative skeleton).
+"""Otodom spider — inert skeleton.
 
-Inactive: Otodom is behind DataDome anti-bot and returns a JS shell
-page with no ``__NEXT_DATA__`` (ADR 0013, superseded by ADR 0014). The
-project's data source is the Kaggle dataset (``make data``). This class
-is retained only to show the scraping architectural pattern; every
-method raises to make the inactive status unmistakable.
+DataDome blocks the site (ADR 0013 → 0014); we use Kaggle data instead.
+Kept only to show the shape. Every method raises.
 """
 
 from __future__ import annotations

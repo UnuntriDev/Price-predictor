@@ -24,11 +24,10 @@ _OptDistance = Annotated[float | None, Field(default=None, ge=0.0)]
 
 
 class Listing(BaseModel):
-    """One apartment listing from the Kaggle dataset.
+    """One Kaggle apartment row.
 
-    Immutable and ``extra='forbid'`` so dataset drift fails loudly.
-    Nullable fields mirror the dataset's documented missingness; values
-    are not invented.
+    Frozen + ``extra='forbid'`` so dataset drift fails loud. Nullable
+    fields follow the dataset's own missingness — never imputed here.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid", str_strip_whitespace=True)
@@ -79,11 +78,11 @@ class Listing(BaseModel):
 
     @model_validator(mode="after")
     def _build_year_not_future(self) -> Self:
-        """Reject construction years after the current year."""
+        """No build years past today."""
         validate_build_year_not_future(self.build_year)
         return self
 
     @property
     def price_per_sqm(self) -> float:
-        """Price per square metre in PLN."""
+        """PLN per m²."""
         return round(self.price_pln / self.square_meters, 2)

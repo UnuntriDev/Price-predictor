@@ -1,10 +1,4 @@
-"""Custom exception hierarchy.
-
-Every error raised by first-party code derives from
-:class:`PricePredictorError`, so callers can catch the whole subsystem
-with one ``except`` while still discriminating on the specific subclass.
-The tree mirrors the package's module boundaries.
-"""
+"""Exception tree — one base, one ``except`` to cover the whole subsystem."""
 
 from __future__ import annotations
 
@@ -20,9 +14,8 @@ class ConfigurationError(PricePredictorError):
 class DomainValidationError(PricePredictorError):
     """A value violates a domain invariant.
 
-    Raised by hand-written checks; Pydantic's own ``ValidationError`` is
-    wrapped into this at adapter boundaries so the rest of the codebase
-    never imports pydantic just to catch validation failures.
+    Adapters wrap Pydantic ``ValidationError`` into this so the rest of
+    the codebase doesn't import pydantic just to catch it.
     """
 
 

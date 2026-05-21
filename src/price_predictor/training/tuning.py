@@ -13,15 +13,7 @@ from price_predictor.training.estimators import build_estimator
 
 
 class OptunaTuner:
-    """Bayesian search minimising cross-validated MAE.
-
-    Args:
-        n_trials: Number of Optuna trials.
-        timeout_seconds: Wall-clock budget for the study.
-        estimator_name: Which estimator's space to search.
-        cv_folds: K for the inner cross-validation.
-        seed: Sampler/CV seed for reproducible studies.
-    """
+    """TPE search minimising cross-validated MAE."""
 
     def __init__(
         self,
@@ -45,14 +37,7 @@ class OptunaTuner:
         }
 
     def search(self, features: pl.DataFrame, target: pl.Series) -> dict[str, object]:
-        """See :meth:`HyperparameterTuner.search`.
-
-        Returns:
-            The best hyper-parameters found.
-
-        Raises:
-            TrainingError: If inputs are empty or misaligned.
-        """
+        """See :meth:`HyperparameterTuner.search`."""
         if features.height == 0 or features.height != target.len():
             msg = "search needs aligned non-empty data"
             raise TrainingError(msg)

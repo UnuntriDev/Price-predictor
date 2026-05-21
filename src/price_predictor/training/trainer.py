@@ -14,34 +14,14 @@ _log = get_logger(__name__)
 
 
 class GradientBoostingTrainer:
-    """Trains the configured boosting estimator (xgb / lgbm / catboost).
-
-    The input feature frame must be fully numeric (the caller runs
-    :class:`~price_predictor.features.PriceFeaturePipeline` and any
-    categorical encoding first); this keeps the trainer estimator-only.
-
-    Args:
-        estimator_name: Hydra-selected estimator key.
-        params: Estimator hyper-parameters from the Hydra ``model`` group.
-    """
+    """Fits xgb / lgbm / catboost on an already-numeric frame."""
 
     def __init__(self, estimator_name: str, params: dict[str, object]) -> None:
         self._estimator_name = estimator_name
         self._params = params
 
     def train(self, features: pl.DataFrame, target: pl.Series) -> Any:
-        """Fit and return the underlying estimator.
-
-        Args:
-            features: Numeric feature frame.
-            target: Target series aligned with ``features``.
-
-        Returns:
-            The fitted estimator.
-
-        Raises:
-            TrainingError: If inputs are empty or misaligned.
-        """
+        """Fit the estimator."""
         if features.height == 0 or features.height != target.len():
             msg = (
                 f"train needs aligned non-empty data, got "

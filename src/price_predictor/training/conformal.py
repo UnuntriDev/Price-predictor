@@ -1,9 +1,8 @@
-"""Split (inductive) conformal regression (ADR 0008).
+"""Split-conformal regression (ADR 0008).
 
-Model-agnostic prediction intervals: calibrate on a held-out split,
-then every prediction gets a symmetric band of width ``q`` where ``q``
-is the conformal-adjusted quantile of absolute calibration residuals.
-The band has finite-sample marginal coverage >= ``1 - alpha``.
+Calibrate on a held-out split, then every prediction gets ± q where q is
+the conformal-adjusted quantile of |residuals|. Marginal coverage is
+≥ 1 - alpha by construction (finite-sample, no distributional assumption).
 """
 
 from __future__ import annotations
@@ -26,12 +25,7 @@ class IntervalPrediction(NamedTuple):
 
 
 class ConformalRegressor:
-    """Wraps a fitted estimator with split-conformal intervals.
-
-    Args:
-        estimator: An already-fitted regressor exposing ``predict``.
-        alpha: Miscoverage rate; ``1 - alpha`` is the target coverage.
-    """
+    """Wraps a fitted regressor with a calibrated ± interval."""
 
     def __init__(self, estimator: Any, alpha: float = 0.1) -> None:
         if not 0.0 < alpha < 1.0:
@@ -46,46 +40,27 @@ class ConformalRegressor:
         x_cal: Any,
         y_cal: npt.NDArray[np.float64],
     ) -> Self:
-        """Compute the conformal quantile from calibration residuals.
-
-        Args:
-            x_cal: Calibration features.
-            y_cal: Calibration targets.
-
-        Returns:
-            ``self``.
-
-        Raises:
-            TrainingError: If the calibration set is empty.
-        """
+        """Set ``q`` from absolute residuals on the calibration split."""
         n = int(y_cal.shape[0])
         if n == 0:
             msg = "conformal calibration set is empty"
             raise TrainingError(msg)
         residuals = np.abs(y_cal - np.asarray(self._estimator.predict(x_cal)))
-        # Conformal level: ceil((n + 1)(1 - alpha)) / n, clipped to 1.0.
+        # Conformal level: ceil((n+1)(1-alpha)) / n, clipped to 1.
         level = min(math.ceil((n + 1) * (1.0 - self._alpha)) / n, 1.0)
         self._q = float(np.quantile(residuals, level, method="higher"))
         return self
 
     @property
     def q(self) -> float:
-        """The calibrated conformal half-width.
-
-        Raises:
-            TrainingError: If accessed before :meth:`calibrate`.
-        """
+        """Calibrated half-width."""
         if self._q is None:
             msg = "q accessed before calibrate"
             raise TrainingError(msg)
         return self._q
 
     def predict(self, x: Any) -> IntervalPrediction:
-        """Return point predictions with the calibrated band.
-
-        Raises:
-            TrainingError: If called before :meth:`calibrate`.
-        """
+        """Point estimate + ±q band."""
         if self._q is None:
             msg = "predict called before calibrate"
             raise TrainingError(msg)

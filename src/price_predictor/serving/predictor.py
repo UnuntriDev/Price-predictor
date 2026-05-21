@@ -1,9 +1,7 @@
-"""Registry-backed predictor.
+"""Pulls the model from the registry on first use.
 
-Loads a model once from the registry (lazy, then cached) and serves
-predictions. The loaded model accepts the raw request feature columns,
-so serving stays decoupled from feature engineering. If the model
-carries a ``conformal_q`` attribute it becomes a prediction interval.
+If the loaded artefact has ``conformal_q`` the response carries an
+interval (ADR 0008).
 """
 
 from __future__ import annotations
@@ -36,14 +34,7 @@ class _Loaded:
 
 
 class ModelBackedPredictor:
-    """Serves predictions from the model at a registry stage.
-
-    Args:
-        registry: Source of the runnable model. Injected so the service
-            never imports MLflow directly.
-        model_name: Registered model name to serve.
-        stage: Which lifecycle stage to load.
-    """
+    """Lazy-load + cache, then predict."""
 
     def __init__(
         self,
@@ -54,9 +45,6 @@ class ModelBackedPredictor:
         self._registry = registry
         self._model_name = model_name
         self._stage = stage
-        # Single source of truth for load state: None until warmup/first
-        # request succeeds. Avoids drift between a `_model` field and a
-        # parallel `_version` cache.
         self._loaded: _Loaded | None = None
 
     def _ensure_loaded(self) -> Any:
@@ -65,8 +53,7 @@ class ModelBackedPredictor:
                 model = self._registry.load_model(self._model_name, self._stage)
                 version = self._registry.get_version(self._model_name, self._stage).version
             except Exception as exc:
-                # Boundary: any registry/MLflow failure (incl. unreachable
-                # server) becomes the one domain error serving handles.
+                # Any MLflow blow-up → one domain error.
                 msg = f"could not load '{self._model_name}'@{self._stage}"
                 raise ModelNotLoadedError(msg) from exc
             self._loaded = _Loaded(model=model, version=version)
@@ -74,11 +61,7 @@ class ModelBackedPredictor:
         return self._loaded.model
 
     def describe_model(self) -> ModelInfo:
-        """Snapshot of what is loaded (no I/O, never raises).
-
-        ``/health`` calls this to expose the live artefact's identity
-        without coupling to MLflow.
-        """
+        """Read state for ``/health`` (never raises)."""
         return ModelInfo(
             name=self._model_name,
             version=self._loaded.version if self._loaded is not None else "",
@@ -87,12 +70,9 @@ class ModelBackedPredictor:
         )
 
     def warmup(self) -> None:
-        """Eagerly load the model at startup (ADR 0011), tolerantly.
-
-        A failure (registry/network down) is logged, not raised, so the
-        container still becomes healthy; ``/predict`` then returns 503
-        and retries the load on each request until it succeeds.
-        """
+        """Try to load at startup, swallow if it fails (ADR 0011)."""
+        # Registry can be down; container still becomes healthy and
+        # /predict retries the load per request.
         try:
             self._ensure_loaded()
         except ModelNotLoadedError as exc:
@@ -101,8 +81,7 @@ class ModelBackedPredictor:
     def predict(self, request: PredictionRequest) -> PredictionResult:
         """See :meth:`PredictorService.predict`."""
         model = self._ensure_loaded()
-        # ``_ensure_loaded`` succeeded, so ``_loaded`` is set here.
-        assert self._loaded is not None
+        assert self._loaded is not None  # _ensure_loaded set it
         row: dict[str, list[Any]] = {}
         for col in FEATURE_COLUMNS:
             value = getattr(request, col)

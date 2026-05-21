@@ -1,9 +1,6 @@
-"""Production ASGI composition root.
+"""Composition root for prod. Everything else depends on ports.
 
-This is the one place that wires concrete adapters together. Everything
-downstream depends on ports, so swapping the registry or predictor is a
-change here only. ``uvicorn --factory price_predictor.serving.asgi:get_app``
-calls :func:`get_app`.
+uvicorn entry: ``uvicorn --factory price_predictor.serving.asgi:get_app``.
 """
 
 from __future__ import annotations
@@ -17,11 +14,7 @@ from price_predictor.serving.predictor import ModelBackedPredictor
 
 
 def get_app() -> FastAPI:
-    """Build the fully wired FastAPI application from settings.
-
-    Returns:
-        The ASGI app with a registry-backed predictor injected.
-    """
+    """Build the wired FastAPI app from settings."""
     settings = get_settings()
     configure_logging(settings.logging)
     registry = MLflowModelRegistry(settings.mlflow)

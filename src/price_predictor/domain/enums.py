@@ -1,8 +1,7 @@
-"""Closed enumerations used across the domain.
+"""Closed enums shared across the domain.
 
-String-valued so they serialise cleanly to JSON, Postgres, and Parquet
-without an adapter layer. Values mirror the Kaggle "Apartment Prices in
-Poland" dataset verbatim so the loader maps without a translation table.
+StrEnum so JSON/Postgres/Parquet need no adapter. Values match the
+Kaggle dataset verbatim — no translation table in the loader.
 """
 
 from __future__ import annotations
@@ -11,7 +10,7 @@ from enum import StrEnum
 
 
 class CityEnum(StrEnum):
-    """The 15 cities present in the dataset."""
+    """15 cities in the Kaggle dataset."""
 
     SZCZECIN = "szczecin"
     GDYNIA = "gdynia"
@@ -31,7 +30,7 @@ class CityEnum(StrEnum):
 
 
 class PropertyType(StrEnum):
-    """Dataset ``type`` column (often missing -> Optional in the model)."""
+    """``type`` column — often missing."""
 
     APARTMENT_BUILDING = "apartmentBuilding"
     APARTMENT_BLOCK = "apartmentBlock"
@@ -40,7 +39,7 @@ class PropertyType(StrEnum):
 
 
 class OwnershipType(StrEnum):
-    """Dataset ``ownership`` column. Note the Polish 'udział'."""
+    """``ownership`` column — yes, one value is in Polish ('udział')."""
 
     CONDOMINIUM = "condominium"
     COOPERATIVE = "cooperative"
@@ -48,25 +47,21 @@ class OwnershipType(StrEnum):
 
 
 class BuildingMaterial(StrEnum):
-    """Dataset ``buildingMaterial`` column (frequently missing)."""
+    """``buildingMaterial`` column — frequently missing."""
 
     BRICK = "brick"
     CONCRETE_SLAB = "concreteSlab"
 
 
 class ConditionType(StrEnum):
-    """Dataset ``condition`` column (mostly missing)."""
+    """``condition`` column — mostly missing."""
 
     LOW = "low"
     PREMIUM = "premium"
 
 
 class ModelStage(StrEnum):
-    """Lifecycle stage of a registered model version.
-
-    Mirrors the MLflow Model Registry stages so the registry adapter is a
-    thin pass-through rather than a mapping layer.
-    """
+    """Mirrors MLflow Model Registry stages (no mapping layer)."""
 
     NONE = "none"
     STAGING = "staging"

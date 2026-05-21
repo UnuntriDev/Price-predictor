@@ -1,9 +1,8 @@
-"""Feature pipeline for the Kaggle apartment data (ADR 0014).
+"""Feature pipeline for the Kaggle dataset (ADR 0014).
 
-Stateful fit/transform: ``fit`` learns per-column medians for numeric
-imputation; ``transform`` imputes (numeric median, boolean -> False,
-categorical -> "missing") and emits exactly the modelled feature
-columns. The target and identifiers are never emitted (no leakage).
+fit learns medians; transform imputes (numeric→median, bool→False,
+categorical→"missing") and emits exactly the modelled columns —
+target/ids stripped to keep leakage out.
 """
 
 from __future__ import annotations
@@ -38,11 +37,7 @@ _MISSING = "missing"
 
 
 class PriceFeaturePipeline:
-    """Median/sentinel imputer + feature selector.
-
-    Args:
-        target_col: Target column expected to be present at fit time.
-    """
+    """Median/sentinel imputer + column projector."""
 
     def __init__(self, target_col: str = "price_pln") -> None:
         self._target_col = target_col
@@ -50,21 +45,11 @@ class PriceFeaturePipeline:
 
     @property
     def is_fitted(self) -> bool:
-        """Whether :meth:`fit` has run."""
+        """True once :meth:`fit` has run."""
         return bool(self._medians)
 
     def fit(self, frame: pl.DataFrame) -> Self:
-        """Learn numeric-column medians from ``frame``.
-
-        Args:
-            frame: Validated listings frame containing ``target_col``.
-
-        Returns:
-            ``self``.
-
-        Raises:
-            FeatureError: If the target column is absent.
-        """
+        """Learn per-column medians."""
         if self._target_col not in frame.columns:
             msg = f"fit requires target column {self._target_col!r}"
             raise FeatureError(msg)
@@ -75,11 +60,7 @@ class PriceFeaturePipeline:
         return self
 
     def transform(self, frame: pl.DataFrame) -> pl.DataFrame:
-        """Emit the imputed feature frame (columns = :data:`FEATURE_COLUMNS`).
-
-        Raises:
-            FeatureError: If called before :meth:`fit`.
-        """
+        """Impute + project to :data:`FEATURE_COLUMNS`."""
         if not self._medians:
             msg = "transform called before fit"
             raise FeatureError(msg)

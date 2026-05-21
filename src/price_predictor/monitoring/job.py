@@ -1,9 +1,7 @@
-"""Drift job: gate (KS+PSI) + human Evidently HTML report.
+"""Drift CLI: KS+PSI gate + Evidently HTML.
 
-Packaged (not a loose script) so it is importable in the container and
-locally. The Kaggle data is a monthly panel, so reference = all earlier
-snapshots and current = the latest ``snapshot_month`` (falling back to a
-50/50 split when only one snapshot is present).
+Monthly panel data — reference is everything earlier, current is the
+latest snapshot. Falls back to a 50/50 split when there's only one.
 """
 
 from __future__ import annotations
@@ -35,7 +33,7 @@ def _split(frame: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
 
 
 def main() -> int:
-    """Run the drift gate and write the Evidently HTML report."""
+    """Run the gate; write the HTML report."""
     settings = get_settings()
     configure_logging(settings.logging)
     raw_dir = Path(settings.data_dir) / "raw"

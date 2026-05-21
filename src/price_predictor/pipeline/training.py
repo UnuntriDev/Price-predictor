@@ -1,13 +1,7 @@
-"""End-to-end training orchestration.
+"""End-to-end training: validate → split → fit → calibrate → register.
 
-Wires the verified building blocks into one flow:
-
-    validate -> split -> fit features -> fit estimator -> conformal
-    calibrate -> evaluate -> log+register -> promotion recommendation
-
-Everything is injected (the listings frame and the registry), so this
-runs as a fast unit test with a fake registry and as a real run against
-MLflow with no code change.
+Listings frame and registry are injected — same function runs under a
+fake registry in tests and against MLflow in prod.
 """
 
 from __future__ import annotations
@@ -42,7 +36,7 @@ _CATEGORICAL = ["city", "property_type", "ownership", "building_material", "cond
 
 
 class TrainingRunResult(BaseModel):
-    """Outcome of one orchestrated training run."""
+    """Output of :func:`run_training`."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -79,27 +73,7 @@ def run_training(
     seed: int = 42,
     primary_metric: str = "mae",
 ) -> TrainingRunResult:
-    """Train, calibrate, register, and recommend in one call.
-
-    Args:
-        listings: Raw listings frame (must satisfy ``RawListingSchema``).
-        registry: Where the artifact is logged + registered.
-        model_name: Registered model name.
-        estimator_name: xgboost / lightgbm / catboost.
-        estimator_params: Estimator hyper-parameters.
-        alpha: Conformal miscoverage rate.
-        test_size: Hold-out test fraction.
-        calibration_size: Conformal calibration fraction.
-        seed: Split seed.
-        primary_metric: Metric the promotion gate hinges on.
-
-    Returns:
-        The run result (metrics, registered version, recommendation).
-
-    Raises:
-        TrainingError: If the data cannot be split.
-        SchemaValidationError: If the frame violates the contract.
-    """
+    """Train, calibrate, register, recommend — one call."""
     valid = PanderaListingValidator().validate(listings)
     train_idx, cal_idx, test_idx = _split(valid.height, test_size, calibration_size, seed)
     train_df, cal_df, test_df = valid[train_idx], valid[cal_idx], valid[test_idx]

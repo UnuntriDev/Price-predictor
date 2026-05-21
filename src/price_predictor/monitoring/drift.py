@@ -1,9 +1,7 @@
-"""Statistical data-drift detector (ADR 0012).
+"""KS + PSI drift gate (ADR 0012).
 
-Per-feature two-sample comparison of a current window against a
-reference window: Kolmogorov-Smirnov for numeric columns, Population
-Stability Index for categorical columns. Deterministic and dependency-
-stable; Evidently is used elsewhere only for human-facing HTML reports.
+KS on numeric columns, PSI on categorical, two-sample reference vs
+current. Deterministic — Evidently is kept for HTML reports only.
 """
 
 from __future__ import annotations
@@ -36,16 +34,7 @@ def _psi(reference: pl.Series, current: pl.Series) -> float:
 
 
 class StatisticalDriftDetector:
-    """KS (numeric) + PSI (categorical) drift detector.
-
-    Args:
-        p_value_threshold: KS p-value below which a numeric feature is
-            flagged as drifted.
-        psi_threshold: PSI above which a categorical feature is flagged
-            (0.2 is the common "moderate shift" rule of thumb).
-        dataset_drift_share: Fraction of drifted features at/above which
-            the dataset as a whole is declared drifted.
-    """
+    """Per-feature drift, then a dataset-level verdict (PSI 0.2 = moderate)."""
 
     def __init__(
         self,
@@ -58,11 +47,7 @@ class StatisticalDriftDetector:
         self._dataset_share = dataset_drift_share
 
     def detect(self, reference: pl.DataFrame, current: pl.DataFrame) -> DriftReport:
-        """See :meth:`DriftDetector.detect`.
-
-        Raises:
-            MonitoringError: If the frames share no columns or are empty.
-        """
+        """See :meth:`DriftDetector.detect`."""
         shared = [c for c in reference.columns if c in current.columns]
         if not shared or reference.height == 0 or current.height == 0:
             msg = "drift detection needs non-empty frames with shared columns"

@@ -1,20 +1,8 @@
-"""Streamlit demo front-end.
+"""Streamlit demo: POSTs the form to the FastAPI on localhost:8000.
 
-Renders a form, POSTs the request to the FastAPI service running on
-``http://127.0.0.1:8000`` inside the same container (supervisord wires
-both processes, see ADR 0004), and displays the price + conformal
-interval. All UI code lives in :func:`main` so importing the module has
-no side effects (keeps it unit-testable); ``streamlit run`` executes
-this file as ``__main__`` and the guard at the bottom invokes ``main``.
-
-Labels are in Polish (the model is Polish-market-only); API values
-stay lowercase ASCII to satisfy the CityEnum / OwnershipType contracts.
-The user picks a city plus a district from a per-city dropdown, or
-chooses "Inna lokalizacja" and types free text — the UI then tries a
-fuzzy district match before falling back to the city centre. The city
-selectbox lives outside the form so that switching cities re-renders
-the district list (widgets inside ``st.form`` don't trigger reruns
-until submit).
+Supervisord wires both processes in the HF Space container (ADR 0004).
+UI labels are Polish; API values stay lowercase ASCII to satisfy the
+domain enums.
 """
 
 from __future__ import annotations
@@ -34,8 +22,7 @@ import streamlit as st
 API_URL = os.environ.get("PP_INTERNAL_API_URL", "http://127.0.0.1:8000")
 _TIMEOUT = 30
 
-# Display name (Polish, proper case) -> approximate city-centre coords.
-# The dict key is the canonical API value (lowercase ASCII, CityEnum).
+# Keys match CityEnum values (lowercase ASCII).
 _CITY_CENTRES: dict[str, tuple[float, float]] = {
     "warszawa": (52.2297, 21.0122),
     "krakow": (50.0647, 19.9450),
@@ -85,7 +72,7 @@ _OWNERSHIP_PL: dict[str, str] = {
 
 @dataclass(frozen=True)
 class LocationResolution:
-    """Approximate location used to build the API payload."""
+    """Coordinates the UI feeds into the API request."""
 
     latitude: float
     longitude: float
@@ -211,10 +198,11 @@ _DISTRICTS: dict[str, tuple[_KnownPlace, ...]] = {
     ),
 }
 
+# NFKD doesn't decompose 'ł' — handle it manually before stripping marks.
 _POLISH_TRANSLATION = str.maketrans({"ł": "l", "Ł": "l"})
 
-# Sentinels for the district dropdown — distinct from real district
-# labels so we can safely test on identity / equality.
+# Sentinels for the district dropdown. Picked to never collide with a
+# real label.
 _DISTRICT_CENTRE = "__centre__"
 _DISTRICT_OTHER = "__other__"
 
@@ -246,7 +234,6 @@ def _city_centre_location(city: str) -> LocationResolution:
 
 
 def _place_location(city: str, place: _KnownPlace) -> LocationResolution:
-    """Build a matched ``LocationResolution`` for a known district."""
     centre = _CITY_CENTRES[city]
     point = (place.latitude, place.longitude)
     return LocationResolution(
@@ -259,17 +246,11 @@ def _place_location(city: str, place: _KnownPlace) -> LocationResolution:
 
 
 def _resolve_location(city: str, address_or_district: str) -> LocationResolution:
-    """Best-effort match of a free-text address against known districts.
-
-    Used for the "Inna lokalizacja" path. Falls back to the city centre
-    with ``matched=False`` when nothing matches non-empty text.
-    """
     query = _normalise_location(address_or_district)
     if query:
         for place in _DISTRICTS.get(city, ()):
             if re.search(rf"\b{re.escape(_normalise_location(place.label))}\b", query):
                 return _place_location(city, place)
-        # Non-empty text but no match — flag so the UI can warn.
         return replace(_city_centre_location(city), matched=False)
     return _city_centre_location(city)
 
@@ -279,15 +260,8 @@ def _resolve_from_choice(
     district_choice: str,
     address_hint: str,
 ) -> LocationResolution:
-    """Resolve a (city, dropdown choice, optional free-text hint).
-
-    Sentinels ``_DISTRICT_CENTRE`` / ``_DISTRICT_OTHER`` route to city
-    centre / free-text matching respectively; anything else is treated
-    as an exact district label.
-    """
     if district_choice == _DISTRICT_CENTRE:
         return _city_centre_location(city)
-
     if district_choice == _DISTRICT_OTHER:
         return _resolve_location(city, address_hint)
 
@@ -295,9 +269,8 @@ def _resolve_from_choice(
         if place.label == district_choice:
             return _place_location(city, place)
 
-    # Reached only if the caller passed a district label that isn't in
-    # ``_DISTRICTS`` for this city — a programmer error, not a user one,
-    # because the UI builds the dropdown from the same dict.
+    # The UI builds the dropdown from _DISTRICTS, so reaching here means
+    # the caller passed something we never offered — surface it.
     msg = f"unknown district {district_choice!r} for city {city!r}"
     raise ValueError(msg)
 
@@ -314,14 +287,10 @@ def _call_predict(payload: dict[str, Any]) -> dict[str, Any]:
         return body
 
 
+# Streamlit re-runs the script top-to-bottom on every widget change;
+# the cache avoids a fresh localhost roundtrip per keystroke.
 @st.cache_data(ttl=30, show_spinner=False)
 def _fetch_health() -> dict[str, Any] | None:
-    """Read ``/health`` for the footer. Best-effort — never raises.
-
-    Cached for 30 s so that the badge does not trigger a localhost
-    roundtrip on every Streamlit rerun (every keystroke / widget change
-    re-runs the script top-to-bottom).
-    """
     try:
         with urllib.request.urlopen(f"{API_URL}/health", timeout=_TIMEOUT) as resp:
             body: dict[str, Any] = json.loads(resp.read().decode("utf-8"))
@@ -360,8 +329,8 @@ def main() -> None:
     if badge is not None:
         st.caption(badge)
 
-    # City lives outside the form so changing it re-renders the
-    # district dropdown below with the right per-city list.
+    # Outside the form: widgets inside st.form don't trigger reruns
+    # until submit, so the district list below wouldn't refresh.
     city = st.selectbox(
         "Miasto",
         list(_CITY_PL),

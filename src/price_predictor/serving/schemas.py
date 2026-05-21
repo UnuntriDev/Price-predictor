@@ -1,9 +1,4 @@
-"""HTTP-only response models.
-
-Request/response payloads reuse the domain contracts directly
-(``PredictionRequest`` / ``PredictionResult``); only transport-specific
-shapes live here.
-"""
+"""Transport-only response shapes. Domain contracts are reused as-is."""
 
 from __future__ import annotations
 
@@ -13,11 +8,7 @@ from price_predictor.domain import ModelStage
 
 
 class ModelInfo(BaseModel):
-    """Metadata about the model currently backing ``/predict``.
-
-    Surfaced on ``/health`` so operators (and the UI footer) can see
-    which registry artefact is live without poking MLflow directly.
-    """
+    """Identity of the artefact backing ``/predict``."""
 
     name: str
     version: str
@@ -26,10 +17,9 @@ class ModelInfo(BaseModel):
 
 
 class HealthResponse(BaseModel):
-    """Liveness/readiness probe payload."""
+    """Liveness/readiness payload."""
 
-    # Avoid Pydantic v2's protected ``model_`` namespace warning on the
-    # ``model_info`` field name.
+    # ``model_info`` collides with Pydantic v2's protected namespace.
     model_config = ConfigDict(protected_namespaces=())
 
     status: str

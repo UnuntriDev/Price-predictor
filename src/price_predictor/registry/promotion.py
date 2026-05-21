@@ -1,9 +1,4 @@
-"""Automated promotion recommendation (ADR 0010).
-
-A human owns the actual stage transition; this module only computes an
-evidence-based *recommendation* by comparing a candidate's primary
-metric against the incumbent production model.
-"""
+"""Automated promotion advice (ADR 0010). The transition itself is manual."""
 
 from __future__ import annotations
 
@@ -15,7 +10,7 @@ from price_predictor.domain import RegistryError
 
 
 class PromotionRecommendation(BaseModel):
-    """Advice for a human promotion gate."""
+    """Promote/hold + the numbers behind the decision."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -35,25 +30,7 @@ def recommend_promotion(
     lower_is_better: bool = True,
     min_relative_improvement: float = 0.0,
 ) -> PromotionRecommendation:
-    """Recommend whether to promote the candidate model.
-
-    Args:
-        candidate_metrics: The new run's metrics.
-        incumbent_metrics: The current production model's metrics, or
-            ``None`` if there is no production model yet.
-        primary: Metric key the decision hinges on.
-        lower_is_better: True for error metrics (MAE/RMSE), False for
-            score metrics (R^2).
-        min_relative_improvement: Required fractional improvement over
-            the incumbent (e.g. ``0.02`` for 2%).
-
-    Returns:
-        The recommendation.
-
-    Raises:
-        RegistryError: If ``primary`` is missing from a provided metrics
-            mapping.
-    """
+    """Compare candidate vs incumbent on ``primary`` and recommend."""
     if primary not in candidate_metrics:
         msg = f"candidate metrics missing primary metric {primary!r}"
         raise RegistryError(msg)

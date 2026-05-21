@@ -1,9 +1,4 @@
-"""FastAPI application factory.
-
-The factory takes its collaborators as arguments (no module-level app,
-no global predictor) so tests construct an app with a fake service and
-production wiring lives in one composition root.
-"""
+"""FastAPI app factory — predictor is injected, no module-level globals."""
 
 from __future__ import annotations
 
@@ -42,27 +37,18 @@ _OUTCOMES = ("ok", "error")
 
 
 def create_app(predictor: PredictorService) -> FastAPI:
-    """Build the inference API around an injected predictor.
-
-    Args:
-        predictor: The service that fulfils prediction requests.
-
-    Returns:
-        A configured :class:`fastapi.FastAPI` instance.
-    """
+    """Wire the API around ``predictor``."""
 
     @asynccontextmanager
     async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
-        # ADR 0011: pull the model from the registry at startup. Tolerant
-        # by design - a registry outage must not stop the app becoming
-        # healthy (warmup swallows failures; /predict retries + 503s).
+        # ADR 0011: warmup never blocks healthiness. /predict re-tries.
         warmup = getattr(predictor, "warmup", None)
         if callable(warmup):
             warmup()
         yield
 
     app = FastAPI(title="PricePredictor API", version=__version__, lifespan=_lifespan)
-    # Initialise label series so /metrics exposes them before any request.
+    # Seed both label series so /metrics exposes them pre-traffic.
     for outcome in _OUTCOMES:
         PREDICTION_REQUESTS.labels(outcome=outcome)
 
@@ -97,7 +83,7 @@ def _json_error(status_code: int, detail: str) -> JSONResponse:
 
 
 def _register_error_handlers(app: FastAPI) -> None:
-    """Map the domain exception hierarchy onto HTTP status codes."""
+    """Domain exceptions → HTTP status codes."""
 
     @app.exception_handler(NotImplementedError)
     async def _not_implemented(_request: Request, exc: NotImplementedError) -> JSONResponse:

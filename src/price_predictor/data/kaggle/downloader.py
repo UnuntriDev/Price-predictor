@@ -1,9 +1,7 @@
-"""Kaggle dataset downloader (ADR 0014).
+"""Kaggle CLI wrapper (ADR 0014).
 
-Wraps the Kaggle CLI. Credentials are resolved the way the CLI itself
-does: ``~/.kaggle/kaggle.json`` or the ``KAGGLE_USERNAME`` /
-``KAGGLE_KEY`` environment variables. Missing creds or a CLI failure
-surface as :class:`DataDownloadError`.
+Creds via ``KAGGLE_USERNAME``/``KAGGLE_KEY`` or ``~/.kaggle/kaggle.json``
+— same lookup the CLI uses. Any failure → :class:`DataDownloadError`.
 """
 
 from __future__ import annotations
@@ -22,7 +20,7 @@ DATASET_SLUG = "krzysztofjamroz/apartment-prices-in-poland"
 
 
 def credentials_available() -> bool:
-    """Return True if Kaggle creds are discoverable."""
+    """True if Kaggle creds are reachable."""
     if os.environ.get("KAGGLE_USERNAME") and os.environ.get("KAGGLE_KEY"):
         return True
     cred = Path.home() / ".kaggle" / "kaggle.json"
@@ -36,27 +34,13 @@ def credentials_available() -> bool:
 
 
 class KaggleDatasetDownloader:
-    """Downloads and unzips the apartment-prices dataset.
-
-    Args:
-        slug: Kaggle ``owner/dataset`` identifier.
-    """
+    """Pulls + unzips the configured dataset."""
 
     def __init__(self, slug: str = DATASET_SLUG) -> None:
         self._slug = slug
 
     def download(self, dest: Path) -> Path:
-        """Download + unzip the dataset into ``dest``.
-
-        Args:
-            dest: Target directory (created if absent).
-
-        Returns:
-            ``dest``.
-
-        Raises:
-            DataDownloadError: If creds are missing or the CLI fails.
-        """
+        """Download + unzip into ``dest`` (created if missing)."""
         if not credentials_available():
             msg = (
                 "Kaggle credentials not found: set KAGGLE_USERNAME/"

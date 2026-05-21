@@ -12,16 +12,7 @@ from price_predictor.domain.listing import NonEmptyStr
 
 
 class ModelVersion(BaseModel):
-    """An immutable pointer to one trained-model artifact.
-
-    Attributes:
-        name: Registered model name.
-        version: Monotonic version string assigned by the registry.
-        stage: Lifecycle stage.
-        run_id: Tracking run that produced the artifact.
-        metrics: Validation metrics captured at registration time.
-        created_at: UTC registration timestamp.
-    """
+    """Pointer to one registered model artefact."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 

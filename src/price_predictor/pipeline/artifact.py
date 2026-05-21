@@ -1,11 +1,7 @@
-"""The deployable model artifact.
+"""Deployable model bundle: feature pipeline + estimator + conformal q.
 
-``ConformalModel`` bundles everything serving needs behind a single
-``predict`` plus a ``conformal_q`` attribute: the fitted feature
-pipeline, the fitted sklearn estimator pipeline, and the conformal
-half-width. It is cloudpickle-friendly so MLflow can log/load it whole,
-and it accepts the *raw request feature columns* so the serving layer
-never has to know about feature engineering.
+Cloudpickle-friendly so MLflow logs/loads it as one object. Accepts the
+raw request columns so serving stays oblivious to feature engineering.
 """
 
 from __future__ import annotations
@@ -17,19 +13,12 @@ import polars as pl
 
 from price_predictor.features import FEATURE_COLUMNS, PriceFeaturePipeline
 
-#: Raw input columns a caller must supply (== the modelled features).
+# Raw columns the caller supplies — same as the modelled features.
 REQUEST_COLUMNS = FEATURE_COLUMNS
 
 
 class ConformalModel:
-    """Serving-ready model: raw request in, price out, plus interval.
-
-    Args:
-        feature_pipeline: A *fitted* :class:`PriceFeaturePipeline`.
-        estimator: A *fitted* sklearn pipeline (encoder + regressor)
-            trained on the feature-pipeline output.
-        conformal_q: Calibrated conformal half-width (PLN).
-    """
+    """Raw request in, price + interval out."""
 
     def __init__(
         self,
@@ -46,13 +35,6 @@ class ConformalModel:
         return self._feature_pipeline.transform(frame).to_pandas()
 
     def predict(self, raw: Any) -> npt.NDArray[Any]:
-        """Predict prices for a pandas frame of raw request columns.
-
-        Args:
-            raw: pandas DataFrame containing :data:`REQUEST_COLUMNS`.
-
-        Returns:
-            1-D array of point price predictions (PLN).
-        """
+        """Point predictions (PLN) for a pandas frame of REQUEST_COLUMNS."""
         predictions: npt.NDArray[Any] = self._estimator.predict(self._features(raw))
         return predictions

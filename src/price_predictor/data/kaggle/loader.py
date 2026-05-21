@@ -1,10 +1,8 @@
-"""Load + normalise the Kaggle sale CSVs into one Polars LazyFrame.
+"""Merge Kaggle sale CSVs into one Polars LazyFrame.
 
-Merges the monthly *sale* snapshots (``apartments_pl_YYYY_MM.csv``;
-rent files are ignored), renames the raw camelCase columns to the
-domain's snake_case, maps the ``yes``/``no`` flag columns to booleans,
-and stamps each row with ``snapshot_month`` parsed from the filename.
-The output matches :class:`RawListingSchema`.
+Renames camelCase→snake, casts yes/no→bool, stamps ``snapshot_month``
+from the filename. Rent files are skipped. Output matches
+:class:`RawListingSchema`.
 """
 
 from __future__ import annotations
@@ -98,17 +96,7 @@ def _yes_no_to_bool(column: str) -> pl.Expr:
 
 
 def load_listings(raw_dir: Path) -> pl.LazyFrame:
-    """Merge every sale snapshot under ``raw_dir`` into one LazyFrame.
-
-    Args:
-        raw_dir: Directory holding ``apartments_pl_YYYY_MM.csv`` files.
-
-    Returns:
-        A LazyFrame with the :class:`RawListingSchema` columns.
-
-    Raises:
-        DataError: If no sale files are present.
-    """
+    """Stack every ``apartments_pl_YYYY_MM.csv`` under ``raw_dir``."""
     frames: list[pl.LazyFrame] = []
     for path in sorted(raw_dir.glob("apartments_pl_*.csv")):
         match = _SALE_FILE.match(path.name)

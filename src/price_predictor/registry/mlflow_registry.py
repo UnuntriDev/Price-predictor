@@ -26,12 +26,7 @@ _METRIC_TAG_PREFIX = "metric."
 
 
 class MLflowModelRegistry:
-    """Wraps the MLflow Model Registry.
-
-    Args:
-        settings: Tracking/registry URIs and experiment name. Injected so
-            tests can target a temp SQLite tracking store.
-    """
+    """MLflow Model Registry adapter."""
 
     def __init__(self, settings: MLflowSettings) -> None:
         self._settings = settings
@@ -41,7 +36,7 @@ class MLflowModelRegistry:
         )
 
     def _configure_global_uris(self) -> None:
-        """Point MLflow flavor APIs at the configured tracking backend."""
+        # MLflow flavor APIs (sklearn.log/load) read these as module globals.
         registry_uri = self._settings.registry_uri or self._settings.tracking_uri
         mlflow.set_tracking_uri(self._settings.tracking_uri)
         mlflow.set_registry_uri(registry_uri)
@@ -103,12 +98,9 @@ class MLflowModelRegistry:
         return self._to_domain(fresh)
 
     def load_model(self, name: str, stage: ModelStage) -> Any:
-        """See :meth:`ModelRegistry.load_model`.
-
-        Uses the sklearn flavor so the original :class:`ConformalModel`
-        object is returned intact (its ``conformal_q`` attribute and
-        ``predict`` survive the round-trip, unlike a pyfunc wrapper).
-        """
+        """See :meth:`ModelRegistry.load_model`."""
+        # sklearn flavor (not pyfunc) — keeps ConformalModel.conformal_q
+        # alive across the round-trip.
         self._configure_global_uris()
         uri = f"models:/{name}/{_STAGE_TO_MLFLOW[stage]}"
         loaded: Any = mlflow.sklearn.load_model(uri)

@@ -10,24 +10,11 @@ from price_predictor.training.report import RegressionReport
 
 
 class RegressionEvaluator:
-    """Computes hold-out regression metrics into a :class:`RegressionReport`."""
+    """MAE / RMSE / MAPE / R² in one pass."""
 
     def evaluate(self, y_true: pl.Series, y_pred: pl.Series) -> RegressionReport:
-        """See :meth:`Evaluator.evaluate`.
-
-        MAPE ignores rows where ``y_true == 0`` (undefined there); R^2 is
-        defined as 0.0 when the target has zero variance.
-
-        Args:
-            y_true: Ground-truth target values.
-            y_pred: Model predictions, aligned with ``y_true``.
-
-        Returns:
-            The populated report.
-
-        Raises:
-            TrainingError: If the inputs are empty or length-mismatched.
-        """
+        """See :meth:`Evaluator.evaluate`."""
+        # MAPE drops y==0 rows (undefined); R² → 0 when target has zero variance.
         yt = y_true.to_numpy().astype(np.float64)
         yp = y_pred.to_numpy().astype(np.float64)
         if yt.size == 0 or yt.size != yp.size:

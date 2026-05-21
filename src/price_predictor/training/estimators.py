@@ -1,9 +1,4 @@
-"""Estimator factory.
-
-Maps the Hydra ``model.name`` key to a concrete scikit-learn-compatible
-regressor. Centralised so the trainer, tuner, and tests agree on exactly
-one construction path.
-"""
+"""Single construction path for the regressor — used by trainer + tuner."""
 
 from __future__ import annotations
 
@@ -39,18 +34,7 @@ _FACTORIES: dict[str, Callable[[dict[str, Any]], Any]] = {
 
 
 def build_estimator(name: str, params: dict[str, Any]) -> Any:
-    """Construct an unfitted regressor by name.
-
-    Args:
-        name: One of ``xgboost`` / ``lightgbm`` / ``catboost``.
-        params: Keyword arguments forwarded to the estimator.
-
-    Returns:
-        The unfitted estimator instance.
-
-    Raises:
-        TrainingError: If ``name`` is not a known estimator.
-    """
+    """Return an unfitted estimator (``xgboost`` / ``lightgbm`` / ``catboost``)."""
     try:
         factory = _FACTORIES[name]
     except KeyError as exc:

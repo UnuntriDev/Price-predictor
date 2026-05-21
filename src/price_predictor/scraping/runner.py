@@ -15,11 +15,7 @@ _DISABLED = (
 
 
 class ScrapyRunner:
-    """Skeleton runner; not wired into any data pipeline.
-
-    Args:
-        settings: Polite-crawl parameters (unused while inactive).
-    """
+    """Skeleton runner; not wired anywhere."""
 
     def __init__(self, settings: ScrapingSettings) -> None:
         self._settings = settings

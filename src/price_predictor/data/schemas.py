@@ -1,10 +1,8 @@
-"""Declarative Pandera contract for the normalised listings frame.
+"""Pandera contract for the normalised listings frame.
 
-The dataframe analogue of :class:`price_predictor.domain.Listing` for
-the Kaggle "Apartment Prices in Poland" data, *after* the loader has
-renamed columns to snake_case, mapped yes/no booleans, and added
-``snapshot_month``. Nullable fields mirror the dataset's documented
-missingness (ADR 0014) — rows are validated, not dropped.
+DataFrame counterpart of :class:`Listing` — after the loader has
+renamed, cast and stamped ``snapshot_month``. Missingness follows the
+dataset (ADR 0014); we validate, never drop rows.
 """
 
 from __future__ import annotations
@@ -29,9 +27,9 @@ def _values(enum: type[StrEnum]) -> list[str]:
 
 
 class RawListingSchema(pa.DataFrameModel):
-    """Schema for the normalised Kaggle listings frame (29 columns)."""
+    """Normalised listings frame, 29 columns."""
 
-    # Not unique: monthly snapshots re-observe the same listing id.
+    # id is not unique — monthly snapshots re-observe the same listing.
     id: Series[str] = pa.Field(nullable=False)
     city: Series[str] = pa.Field(isin=_values(CityEnum), nullable=False)
     property_type: Series[str] = pa.Field(isin=_values(PropertyType), nullable=True)

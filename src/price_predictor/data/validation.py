@@ -11,28 +11,12 @@ from price_predictor.domain import SchemaValidationError
 
 
 class PanderaListingValidator:
-    """Validates listing frames against :class:`RawListingSchema`.
-
-    Pandera's failure modes (wrong dtype, out-of-bound value, missing or
-    extra column, duplicate id) are aggregated with ``lazy=True`` and
-    re-raised as the single domain error the rest of the codebase knows
-    how to catch.
-    """
+    """``RawListingSchema`` enforcement; all failures funnel into one domain error."""
 
     schema: type[RawListingSchema] = RawListingSchema
 
     def validate(self, frame: pl.DataFrame) -> pl.DataFrame:
-        """See :meth:`SchemaContract.validate`.
-
-        Args:
-            frame: The candidate listings frame.
-
-        Returns:
-            The validated (and coerced) frame.
-
-        Raises:
-            SchemaValidationError: If ``frame`` violates the contract.
-        """
+        """See :meth:`SchemaContract.validate`."""
         try:
             validated: pl.DataFrame = RawListingSchema.validate(frame, lazy=True)
         except (

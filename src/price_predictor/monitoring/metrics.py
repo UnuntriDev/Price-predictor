@@ -1,8 +1,4 @@
-"""Prometheus metric definitions.
-
-The metric objects are declared here (a contract the dashboards depend
-on); the call sites that observe them are wired in Phase 2.
-"""
+"""Prometheus metric contract — dashboards point at these names."""
 
 from __future__ import annotations
 

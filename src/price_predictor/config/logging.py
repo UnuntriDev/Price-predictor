@@ -1,10 +1,4 @@
-"""Structured logging setup built on structlog.
-
-A single :func:`configure_logging` call wires structlog and the stdlib
-``logging`` module together so third-party libraries (uvicorn, scrapy,
-mlflow) emit through the same pipeline. Output is human-readable in
-development and line-delimited JSON in production.
-"""
+"""structlog + stdlib logging wiring (JSON in prod, console in dev)."""
 
 from __future__ import annotations
 
@@ -18,17 +12,9 @@ from price_predictor.config.settings import LoggingSettings
 
 
 def configure_logging(settings: LoggingSettings) -> None:
-    """Configure structlog and the stdlib root logger.
-
-    Idempotent: calling it again reconfigures cleanly, which keeps test
-    isolation simple.
-
-    Args:
-        settings: Logging level and output-format selection.
-    """
-    # Force UTF-8 on stdio so third-party libs that print emoji (e.g.
-    # MLflow 3's run-link "View run ... at ..." line) don't crash on
-    # Windows non-UTF8 system locales such as cp1250.
+    """Configure structlog + stdlib root. Idempotent."""
+    # Pin stdio to UTF-8 so MLflow 3's emoji run-link doesn't crash on
+    # Windows cp1250.
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="backslashreplace")
@@ -58,13 +44,6 @@ def configure_logging(settings: LoggingSettings) -> None:
 
 
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:
-    """Return a bound structlog logger for ``name``.
-
-    Args:
-        name: Usually ``__name__`` of the calling module.
-
-    Returns:
-        A logger that inherits the global structlog configuration.
-    """
+    """Bound logger for ``name`` (usually ``__name__``)."""
     logger: structlog.stdlib.BoundLogger = structlog.get_logger(name)
     return logger
