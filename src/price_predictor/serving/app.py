@@ -68,7 +68,9 @@ def create_app(predictor: PredictorService) -> FastAPI:
 
     @app.get("/health", response_model=HealthResponse, tags=["ops"])
     async def health() -> HealthResponse:
-        return HealthResponse(status="ok", version=__version__)
+        describe = getattr(predictor, "describe_model", None)
+        info = describe() if callable(describe) else None
+        return HealthResponse(status="ok", version=__version__, model_info=info)
 
     @app.get("/metrics", tags=["ops"])
     async def metrics() -> Response:

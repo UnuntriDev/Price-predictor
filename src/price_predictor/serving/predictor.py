@@ -23,6 +23,7 @@ from price_predictor.domain import (
 )
 from price_predictor.features import FEATURE_COLUMNS
 from price_predictor.registry.ports import ModelRegistry
+from price_predictor.serving.schemas import ModelInfo
 
 _log = get_logger(__name__)
 
@@ -63,6 +64,20 @@ class ModelBackedPredictor:
             self._version = version
             _log.info("model.loaded", name=self._model_name, version=self._version)
         return self._model
+
+    def describe_model(self) -> ModelInfo:
+        """Snapshot of what is loaded (no I/O, never raises).
+
+        ``/health`` calls this to expose the live artefact's identity
+        without coupling to MLflow. ``loaded`` flips to ``True`` once
+        ``_ensure_loaded`` has succeeded at least once.
+        """
+        return ModelInfo(
+            name=self._model_name,
+            version=self._version,
+            stage=self._stage.value,
+            loaded=self._model is not None,
+        )
 
     def warmup(self) -> None:
         """Eagerly load the model at startup (ADR 0011), tolerantly.
