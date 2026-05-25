@@ -452,12 +452,9 @@ def main() -> None:
             delta=f"± {_fmt_pln((hi - lo) / 2)}",
         )
     st.caption(
-        f"Model: `{result['model_name']}` v{result['model_version']} · "
-        f"lokalizacja: {location.label}, {location.centre_distance_km:.1f} km od centrum · "
-        f"zwrócono o {result['predicted_at']}"
+        f"Lokalizacja użyta przez model: {location.label}, "
+        f"{location.centre_distance_km:.1f} km od centrum."
     )
-    with st.expander("Surowa odpowiedź API"):
-        st.json(result)
 
 
 if __name__ == "__main__":
